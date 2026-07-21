@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">出水小部件</string>
+    <string name="scan_device_qr_hint">对准设备屏幕上的二维码\n保持 8–15 厘米距离，避免反光</string>
+</resources>

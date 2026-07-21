@@ -1,0 +1,36 @@
+# Gradle / Android 构建产物
+.gradle/
+build/
+app/build/
+captures/
+*.apk
+*.aab
+*.ap_
+*.idsig
+
+# 本地环境与 IDE 文件
+local.properties
+.idea/
+*.iml
+.vscode/
+
+# 签名密钥与证书，禁止提交
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# 环境变量与临时文件
+.env
+.env.*
+*.log
+*.tmp
+*.bak
+
+# 敏感配置（API 地址、签名盐值等），不提交到版本控制
+secrets.properties
+
+# 系统文件
+.DS_Store
+Thumbs.db

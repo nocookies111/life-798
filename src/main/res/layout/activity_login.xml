@@ -1,0 +1,208 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#f5f6f8"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="28dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="登录 life798"
+            android:textSize="24sp"
+            android:textColor="#2c3e50"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="手机号 + 短信验证码登录（脱离支付宝）"
+            android:textSize="13sp"
+            android:textColor="#95a5a6"
+            android:layout_marginBottom="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="20dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="登录平台："
+                android:textColor="#7f8c8d"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btn_platform_alipay"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="支付宝小程序"
+                android:textColor="#fff"
+                android:textSize="12sp"
+                android:background="@drawable/btn_save_gradient"
+                android:stateListAnimator="@null"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:layout_marginEnd="6dp" />
+
+            <Button
+                android:id="@+id/btn_platform_app"
+                android:layout_width="0dp"
+                android:layout_height="36dp"
+                android:layout_weight="1"
+                android:text="官方APP"
+                android:textColor="#7f8c8d"
+                android:textSize="12sp"
+                android:background="@drawable/edt_bg"
+                android:stateListAnimator="@null"
+                android:minWidth="0dp"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="手机号"
+            android:textColor="#7f8c8d"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/et_phone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="请输入手机号"
+            android:inputType="phone"
+            android:maxLength="11"
+            android:background="@drawable/edt_bg"
+            android:padding="12dp"
+            android:textSize="15sp"
+            android:textColor="#2c3e50"
+            android:textColorHint="#bdc3c7"
+            android:layout_marginBottom="16dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="图形验证码"
+                android:textColor="#7f8c8d"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/btn_load_captcha"
+                android:layout_width="wrap_content"
+                android:layout_height="38dp"
+                android:text="获取"
+                android:textColor="#fff"
+                android:textSize="13sp"
+                android:background="@drawable/btn_save_gradient"
+                android:stateListAnimator="@null"
+                android:minWidth="0dp"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="16dp">
+
+            <ImageView
+                android:id="@+id/img_captcha"
+                android:layout_width="140dp"
+                android:layout_height="48dp"
+                android:background="@drawable/edt_bg"
+                android:scaleType="fitCenter"
+                android:adjustViewBounds="true"
+                android:padding="2dp"
+                android:layout_marginEnd="10dp" />
+
+            <EditText
+                android:id="@+id/et_graph"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="输入图中数字"
+                android:inputType="number"
+                android:background="@drawable/edt_bg"
+                android:padding="12dp"
+                android:textSize="15sp"
+                android:textColor="#2c3e50"
+                android:textColorHint="#bdc3c7" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_send_sms"
+            android:layout_width="match_parent"
+            android:layout_height="46dp"
+            android:text="发送短信验证码"
+            android:textColor="#fff"
+            android:textSize="15sp"
+            android:background="@drawable/btn_cold_gradient"
+            android:stateListAnimator="@null"
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="短信验证码"
+            android:textColor="#7f8c8d"
+            android:textSize="13sp"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/et_sms"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="请输入收到的短信验证码"
+            android:inputType="number"
+            android:background="@drawable/edt_bg"
+            android:padding="12dp"
+            android:textSize="15sp"
+            android:textColor="#2c3e50"
+            android:textColorHint="#bdc3c7"
+            android:layout_marginBottom="24dp" />
+
+        <Button
+            android:id="@+id/btn_login"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="登录"
+            android:textColor="#fff"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:background="@drawable/btn_save_gradient"
+            android:stateListAnimator="@null" />
+
+        <ProgressBar
+            android:id="@+id/loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="16dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

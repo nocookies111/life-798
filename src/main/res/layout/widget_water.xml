@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- HyperOS 适配：根布局用 @android:id/background 让系统裁圆角 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/background"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_card_bg"
+    android:padding="18dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="14dp">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="8dp"
+            android:src="@drawable/ic_water_drop"
+            android:tint="@color/widget_title" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="出水控制"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/widget_title" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/btn_hot"
+            android:layout_width="0dp"
+            android:layout_height="54dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="7dp"
+            android:text="热水"
+            android:textColor="#ffffff"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:background="@drawable/btn_hot_gradient"
+            android:stateListAnimator="@null" />
+
+        <Button
+            android:id="@+id/btn_cold"
+            android:layout_width="0dp"
+            android:layout_height="54dp"
+            android:layout_weight="1"
+            android:layout_marginStart="7dp"
+            android:text="冷水"
+            android:textColor="#ffffff"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:background="@drawable/btn_cold_gradient"
+            android:stateListAnimator="@null" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="点击按钮出水"
+        android:textSize="13sp"
+        android:textColor="@color/widget_status_text"
+        android:gravity="center"
+        android:layout_marginTop="12dp" />
+</LinearLayout>

@@ -1,0 +1,164 @@
+name: Android CI and Release
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Android build
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Generate secrets.properties
+        run: |
+          echo "API_GATEWAY=${{ secrets.API_GATEWAY }}" > secrets.properties
+          echo "SIGN_SALT=${{ secrets.SIGN_SALT }}" >> secrets.properties
+          echo "API_CID=${{ secrets.API_CID }}" >> secrets.properties
+
+      - name: Run unit tests
+        run: gradle testDebugUnitTest --no-daemon --stacktrace --info
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon --stacktrace --info
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: WaterWidget-test-reports
+          path: |
+            app/build/reports/tests/**
+            app/build/test-results/**
+          if-no-files-found: ignore
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WaterWidget-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  release:
+    name: Build and publish Android release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install required Android SDK packages
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Generate secrets.properties
+        run: |
+          echo "API_GATEWAY=${{ secrets.API_GATEWAY }}" > secrets.properties
+          echo "SIGN_SALT=${{ secrets.SIGN_SALT }}" >> secrets.properties
+          echo "API_CID=${{ secrets.API_CID }}" >> secrets.properties
+
+      - name: Check release signing configuration
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waterwidget-release.jks"
+          ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/waterwidget-release.jks" gradle assembleRelease --no-daemon --stacktrace --info
+
+      - name: Verify release APK signature
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waterwidget-release.jks"
+          keytool -list -v -keystore "$RUNNER_TEMP/waterwidget-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | grep "SHA256:"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/*.apk
+
+      - name: Prepare release APK
+        run: |
+          apk_path=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
+          test -n "$apk_path"
+          mkdir -p "$RUNNER_TEMP/release-assets"
+          cp "$apk_path" "$RUNNER_TEMP/release-assets/WaterWidget-${GITHUB_REF_NAME}-release.apk"
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WaterWidget-${{ github.ref_name }}-release-apk
+          path: ${{ runner.temp }}/release-assets/WaterWidget-${{ github.ref_name }}-release.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset="$RUNNER_TEMP/release-assets/WaterWidget-${GITHUB_REF_NAME}-release.apk"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$asset" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$asset" --generate-notes
+          fi

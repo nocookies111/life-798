@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <application
+        android:label="@string/app_name"
+        android:icon="@drawable/ic_launcher"
+        android:allowBackup="false"
+        android:usesCleartextTraffic="false"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".ConfigActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Quickie 使用 CameraX + ML Kit；覆盖 behind，保证设备扫码页始终竖屏。 -->
+        <activity
+            android:name="io.github.g00fy2.quickie.QRScannerActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            tools:replace="android:screenOrientation" />
+
+        <activity
+            android:name=".DeviceAddActivity"
+            android:exported="false"
+            android:label="添加设备" />
+
+        <activity
+            android:name=".LoginActivity"
+            android:exported="false"
+            android:label="登录账户" />
+
+        <activity
+            android:name=".AccountsActivity"
+            android:exported="false"
+            android:label="账户管理" />
+
+        <activity
+            android:name=".ScoreActivity"
+            android:exported="false"
+            android:label="积分看板" />
+
+        <receiver
+            android:name=".WaterWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.water.widget.ACTION_HOT" />
+                <action android:name="com.water.widget.ACTION_COLD" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info" />
+        </receiver>
+
+        <service android:name=".WaterService" android:exported="false" />
+
+        <service
+            android:name=".HotWaterTileService"
+            android:label="热水"
+            android:icon="@drawable/ic_water_drop"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".ColdWaterTileService"
+            android:label="冷水"
+            android:icon="@drawable/ic_water_drop"
+            android:exported="true"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>
