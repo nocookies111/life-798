@@ -162,6 +162,7 @@ class ConfigActivity : ComponentActivity() {
         appendTaskLog("\n---------- [${account}] 通道 $laneIndex/$laneCount，账号 ${index + 1}/${accounts.size} ----------")
         loadAndRunAccountTasks(account, generation) { gained ->
             if (!isTaskActive(generation)) return@loadAndRunAccountTasks
+            appendTaskLog("  [${account}] 本账号预计获得 $gained 分")
             ui.postDelayed({
                 if (!isTaskActive(generation)) return@postDelayed
                 runAccountLane(accounts, index + 1, laneIndex, laneCount, generation) { nextGained ->
@@ -176,7 +177,7 @@ class ConfigActivity : ComponentActivity() {
             runOnUiThread {
                 if (!isTaskActive(generation)) return@runOnUiThread
                 if (missionJson == null || missionJson.optInt("code", -999) != 0) {
-                    appendTaskLog("  获取任务列表失败: ${missionErr ?: missionJson?.optString("msg", "未知错误")}")
+                    appendTaskLog("  [${account}] 获取任务列表失败: ${missionErr ?: missionJson?.optString("msg", "未知错误")}")
                     done(0)
                     return@runOnUiThread
                 }
@@ -192,7 +193,7 @@ class ConfigActivity : ComponentActivity() {
                                 val doneCount = parseTodayDoneCount(scoreJson)
                                 val work = TaskMissionPlanner.buildWork(plannedMissions, doneCount)
                                 if (work.isEmpty()) {
-                                    appendTaskLog("  无可执行任务（已完成/无积分/已过滤）")
+                                    appendTaskLog("  [${account}] 无可执行任务（已完成/无积分/已过滤）")
                                     done(signGained)
                                 } else {
                                     appendTaskLog("  待执行 ${work.size} 次任务")
@@ -240,15 +241,15 @@ class ConfigActivity : ComponentActivity() {
         )
         when {
             plan.adId.isBlank() -> {
-                appendTaskLog("  每日签到: 无签到数据，跳过")
+                appendTaskLog("  [${account}] 每日签到: 无签到数据，跳过")
                 done(0)
             }
             plan.alreadySigned -> {
-                appendTaskLog("  每日签到: 今日已签到")
+                appendTaskLog("  [${account}] 每日签到: 今日已签到")
                 done(0)
             }
             else -> {
-                appendTaskLog("  每日签到: 未签到，优先执行")
+                appendTaskLog("  [${account}] 每日签到: 未签到，优先执行")
                 sendDailySignIn(account, plan, generation, retry = false, done = done)
             }
         }
@@ -264,7 +265,7 @@ class ConfigActivity : ComponentActivity() {
         if (!isTaskActive(generation)) return
         val token = account.token.takeIf { it.isNotBlank() } ?: account.appToken.takeIf { it.isNotBlank() }
         if (token.isNullOrBlank()) {
-            appendTaskLog("    签到失败: 无可用 Token，继续任务")
+            appendTaskLog("    [${account}] 签到失败: 无可用 Token，继续任务")
             done(0)
             return
         }
@@ -276,21 +277,21 @@ class ConfigActivity : ComponentActivity() {
                     if (!isTaskActive(generation)) return@runOnUiThread
                     when {
                         json?.optInt("code", -999) == 0 -> {
+                            appendTaskLog("    [${account}] 签到成功 +${plan.baseScore}分${if (retry) "（重试）" else ""}")
                             plan.rewards.forEach { reward ->
                                 val description = reward.description.takeIf { it.isNotBlank() }?.let { "（$it）" }.orEmpty()
-                                appendTaskLog("    连签奖励 +${reward.score}分$description")
+                                appendTaskLog("    [${account}] 连签奖励 +${reward.score}分$description")
                             }
-                            appendTaskLog("    签到成功 +${plan.totalScore}分${if (retry) "（重试）" else ""}")
                             done(plan.totalScore)
                         }
                         json?.optInt("code", -999) == -98 && !retry -> {
-                            appendTaskLog("    签到频率限制，60秒后重试一次")
+                            appendTaskLog("    [${account}] 签到频率限制，60秒后重试一次")
                             ui.postDelayed({ sendDailySignIn(account, plan, generation, retry = true, done = done) }, 60000)
                         }
                         else -> {
                             val code = json?.optInt("code", -999)
                             val reason = err ?: json?.optString("msg", "code=$code") ?: "未知错误"
-                            appendTaskLog("    签到失败: $reason，继续任务")
+                            appendTaskLog("    [${account}] 签到失败: $reason，继续任务")
                             done(0)
                         }
                     }
@@ -318,7 +319,7 @@ class ConfigActivity : ComponentActivity() {
                     appMissions = appJson.optJSONObject("data")?.optJSONArray("missions")
                     appendTaskLog("  官方 App 任务数: ${appMissions?.length() ?: 0}，已合并去重")
                 } else {
-                    appendTaskLog("  官方 App 任务获取失败，继续执行支付宝任务")
+                    appendTaskLog("  [${account}] 官方 App 任务获取失败，继续执行支付宝任务")
                 }
                 callback(TaskMissionPlanner.merge(mainMissions, appMissions))
             }
@@ -335,7 +336,6 @@ class ConfigActivity : ComponentActivity() {
     ) {
         if (!isTaskActive(generation)) return
         if (index >= work.size) {
-            appendTaskLog("  [${account}] 本账号预计获得 $gained 分")
             done(gained)
             return
         }
@@ -352,20 +352,20 @@ class ConfigActivity : ComponentActivity() {
                     if (!isTaskActive(generation)) return@runOnUiThread
                     val nextGained = when {
                         json == null -> {
-                            appendTaskLog("    ❌ 网络错误: ${err ?: "未知错误"}")
+                            appendTaskLog("    [${account}] $platformName ${item.name}$round：网络错误 ${err ?: "未知错误"}")
                             gained
                         }
                         json.optInt("code", -999) == 0 -> {
-                            appendTaskLog("    ✅ 已提交 +${item.score}分")
+                            appendTaskLog("    [${account}] $platformName ${item.name}$round：成功 +${item.score}分")
                             gained + item.score
                         }
                         json.optInt("code", -999) == -98 -> {
-                            appendTaskLog("    ⏳ 请求过于频繁，60秒后重试当前任务")
+                            appendTaskLog("    [${account}] $platformName ${item.name}$round：请求过于频繁，60秒后重试")
                             ui.postDelayed({ runMissionItems(account, work, index, gained, generation, done) }, 60000)
                             return@runOnUiThread
                         }
                         else -> {
-                            appendTaskLog("    ❌ code=${json.optInt("code", -999)} ${json.optString("msg", "")}")
+                            appendTaskLog("    [${account}] $platformName ${item.name}$round：失败 code=${json.optInt("code", -999)} ${json.optString("msg", "")}")
                             gained
                         }
                     }

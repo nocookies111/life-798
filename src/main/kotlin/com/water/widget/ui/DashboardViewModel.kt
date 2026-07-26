@@ -73,9 +73,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun appendTaskLog(line: String) {
-        val displayLine = TaskLogFormatter.format(line) ?: return
-        if (taskLogs.lastOrNull() == displayLine) return
-        taskLogs = (taskLogs + displayLine).takeLast(80)
+        val updatedLogs = TaskLogFormatter.append(taskLogs, line)
+        if (updatedLogs === taskLogs) return
+        taskLogs = updatedLogs
         publish()
     }
 

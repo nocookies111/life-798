@@ -12,6 +12,7 @@ class TaskLogFormatterTest {
                 "共 2 个账号，分为 1 个安全通道并发执行；共享账号标识、uid 或 Token 的账号将串行执行。"
             )
         )
+        assertNull(TaskLogFormatter.format("[测试账号] 每日签到: 未签到，优先执行"))
     }
 
     @Test
@@ -25,9 +26,13 @@ class TaskLogFormatterTest {
     }
 
     @Test
-    fun keepsOnlyFinalTaskSummary() {
+    fun keepsMissionResultsAndFinalSummaries() {
         assertNull(TaskLogFormatter.format("[1/8] [APP] 浏览任务 +10分"))
-        assertNull(TaskLogFormatter.format("✅ 已提交 +10分"))
+        assertEquals(
+            "[APP] 浏览任务 +10分",
+            TaskLogFormatter.format("[测试账号] [APP] 浏览任务：成功 +10分")
+        )
+        assertEquals("✅ 已提交 +10分", TaskLogFormatter.format("✅ 已提交 +10分"))
         assertEquals(
             "测试账号：完成 · 获得 80 分",
             TaskLogFormatter.format("[测试账号] 本账号预计获得 80 分")
@@ -35,6 +40,34 @@ class TaskLogFormatterTest {
         assertEquals(
             "全部完成 · 本次获得 80 分",
             TaskLogFormatter.format("===== 全部完成，本次预计获得 80 分 =====")
+        )
+    }
+
+    @Test
+    fun aggregatesSameTaskAcrossAccounts() {
+        val first = TaskLogFormatter.append(emptyList(), "[账号甲] 签到成功 +5分")
+        val second = TaskLogFormatter.append(first, "[账号乙] 签到成功 +5分")
+
+        assertEquals(
+            listOf("签到成功 +10分（5分 × 2）"),
+            second
+        )
+    }
+
+    @Test
+    fun aggregatesMissionRoundsAndAccountsWithoutMixingTasks() {
+        var logs = emptyList<String>()
+        logs = TaskLogFormatter.append(logs, "[账号甲] [APP] 浏览任务 (1/2)：成功 +10分")
+        logs = TaskLogFormatter.append(logs, "[账号甲] [APP] 浏览任务 (2/2)：成功 +10分")
+        logs = TaskLogFormatter.append(logs, "[账号乙] [APP] 浏览任务 (1/2)：成功 +10分")
+        logs = TaskLogFormatter.append(logs, "[账号乙] [支付宝] 浏览任务：成功 +10分")
+
+        assertEquals(
+            listOf(
+                "[APP] 浏览任务 +30分（10分 × 3）",
+                "[支付宝] 浏览任务 +10分"
+            ),
+            logs
         )
     }
 }
