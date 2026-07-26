@@ -1,12 +1,16 @@
 # Gradle / Android 构建产物
 .gradle/
+.kotlin/
 build/
 app/build/
 captures/
+.cxx/
+.externalNativeBuild/
 *.apk
 *.aab
 *.ap_
 *.idsig
+*.hprof
 
 # 本地环境与 IDE 文件
 local.properties
@@ -24,6 +28,7 @@ local.properties
 # 环境变量与临时文件
 .env
 .env.*
+.local-tools/
 *.log
 *.tmp
 *.bak

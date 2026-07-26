@@ -4,6 +4,8 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class DeviceIdParserTest {
+    private val longDeviceId = "123456789012345"
+
     @Test
     fun keepsPlainDeviceId() {
         assertEquals("device-001", DeviceIdParser.normalize("  device-001  "))
@@ -17,16 +19,16 @@ class DeviceIdParserTest {
     @Test
     fun extractsDeviceIdFromHnkzyQrLink() {
         assertEquals(
-            "863781051219856",
-            DeviceIdParser.normalize("https://cloud.hnkzy.com/h5/?atype=1&id=863781051219856#/pages/app/index")
+            longDeviceId,
+            DeviceIdParser.normalize("https://cloud.hnkzy.com/h5/?atype=1&id=$longDeviceId#/pages/app/index")
         )
     }
 
     @Test
     fun extractsDeviceIdFromHnkzyShortLinkPath() {
         assertEquals(
-            "863781051219856",
-            DeviceIdParser.normalize("https://i.hnkzy.com/q/1/863781051219856")
+            longDeviceId,
+            DeviceIdParser.normalize("https://i.hnkzy.com/q/1/$longDeviceId")
         )
     }
 
@@ -41,16 +43,16 @@ class DeviceIdParserTest {
     @Test
     fun extractsLongNumericIdFromGenericUrlPath() {
         assertEquals(
-            "863781051219856",
-            DeviceIdParser.normalize("https://example.test/share/863781051219856")
+            longDeviceId,
+            DeviceIdParser.normalize("https://example.test/share/$longDeviceId")
         )
     }
 
     @Test
     fun extractsDeviceIdFromJsonStylePayload() {
         assertEquals(
-            "863781051219856",
-            DeviceIdParser.normalize("{\"device_id\":\"863781051219856\",\"type\":1}")
+            longDeviceId,
+            DeviceIdParser.normalize("""{"device_id":"$longDeviceId","type":1}""")
         )
     }
 
