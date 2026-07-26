@@ -26,8 +26,6 @@ import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -53,27 +51,20 @@ import io.github.g00fy2.quickie.config.ScannerConfig
 import com.water.widget.ui.WaterTheme
 
 class DeviceAddActivity : ComponentActivity() {
-    companion object {
-        const val EXTRA_ASSIGNMENT = "com.water.widget.EXTRA_ASSIGNMENT"
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         UI.applySystemBarAppearance(this, ThemeSettings.isDark(this))
         setContent {
             WaterTheme(mode = ThemeSettings.mode(this)) {
                 DeviceAddScreen(
-                    initialAssignment = intent.getStringExtra(EXTRA_ASSIGNMENT)?.let { value ->
-                        DeviceAssignment.entries.firstOrNull { it.name.equals(value, ignoreCase = true) }
-                    } ?: DeviceAssignment.BOTH,
-                    onSave = { deviceId, role -> saveDevice(deviceId, role) },
+                    onSave = ::saveDevice,
                     onBack = { finish() }
                 )
             }
         }
     }
 
-    private fun saveDevice(deviceId: String, role: DeviceAssignment) {
+    private fun saveDevice(deviceId: String) {
         val account = AccountStore.getCurrent(this)
         if (account == null) {
             toast("请先登录账户后再添加设备")
@@ -84,15 +75,7 @@ class DeviceAddActivity : ComponentActivity() {
             toast("请输入有效的设备编号")
             return
         }
-        when (role) {
-            DeviceAssignment.HOT -> account.hotDid = normalized
-            DeviceAssignment.COLD -> account.coldDid = normalized
-            DeviceAssignment.BOTH -> {
-                account.hotDid = normalized
-                account.coldDid = normalized
-            }
-        }
-        account.rememberDevice(normalized)
+        account.selectDevice(normalized)
         AccountStore.updateCurrent(this, account)
         toast("设备已保存")
         setResult(RESULT_OK)
@@ -100,12 +83,6 @@ class DeviceAddActivity : ComponentActivity() {
     }
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-}
-
-enum class DeviceAssignment(val label: String) {
-    HOT("热水设备"),
-    COLD("冷水设备"),
-    BOTH("热冷共用")
 }
 
 private fun scannerConfig(): ScannerConfig = ScannerConfig.build {
@@ -129,13 +106,11 @@ private fun scannerConfig(): ScannerConfig = ScannerConfig.build {
 
 @Composable
 private fun DeviceAddScreen(
-    initialAssignment: DeviceAssignment,
-    onSave: (String, DeviceAssignment) -> Unit,
+    onSave: (String) -> Unit,
     onBack: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var deviceId by rememberSaveable { mutableStateOf("") }
-    var assignment by rememberSaveable { mutableStateOf(initialAssignment) }
     val scanner = rememberLauncherForActivityResult(ScanCustomCode()) { result ->
         when (result) {
             is QRResult.QRSuccess -> {
@@ -216,35 +191,7 @@ private fun DeviceAddScreen(
             }
         }
 
-        DeviceAddCard {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("用于", fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    DeviceAssignment.entries.forEach { item ->
-                        FilterChip(
-                            selected = assignment == item,
-                            onClick = { assignment = item },
-                            label = { Text(item.label, fontSize = 12.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
-                                labelColor = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            border = FilterChipDefaults.filterChipBorder(
-                                enabled = true,
-                                selected = assignment == item,
-                                borderColor = MaterialTheme.colorScheme.outlineVariant,
-                                selectedBorderColor = MaterialTheme.colorScheme.primary
-                            )
-                        )
-                    }
-                }
-                Text("如果热水和冷水使用同一台设备，选择“热冷共用”。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-            }
-        }
-
-        Button(onClick = { onSave(deviceId, assignment) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
+        Button(onClick = { onSave(deviceId) }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
             Text("保存设备")
         }
         OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {

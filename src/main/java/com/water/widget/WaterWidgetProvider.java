@@ -10,13 +10,13 @@ import android.widget.RemoteViews;
 /**
  * 桌面小部件 Provider。
  * 不使用 android:configure（HyperOS 不兼容），直接添加。
- * 未配置时整个小部件点击打开配置页；已配置时热水/冷水按钮各出水。
+ * 未配置时整个小部件点击打开配置页；已配置时通过单一按钮启动当前设备。
  */
 public class WaterWidgetProvider extends AppWidgetProvider {
-    public static final String ACTION_HOT = "com.water.widget.ACTION_HOT";
-    public static final String ACTION_COLD = "com.water.widget.ACTION_COLD";
+    public static final String ACTION_START = "com.water.widget.ACTION_START";
+    private static final String LEGACY_ACTION_HOT = "com.water.widget.ACTION_HOT";
+    private static final String LEGACY_ACTION_COLD = "com.water.widget.ACTION_COLD";
     public static final String EXTRA_DID = "extra_did";
-    public static final String EXTRA_NAME = "extra_name";
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
@@ -29,20 +29,20 @@ public class WaterWidgetProvider extends AppWidgetProvider {
     public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         String action = intent.getAction();
-        if (ACTION_HOT.equals(action) || ACTION_COLD.equals(action)) {
+        if (ACTION_START.equals(action)
+                || LEGACY_ACTION_HOT.equals(action)
+                || LEGACY_ACTION_COLD.equals(action)) {
             String did = intent.getStringExtra(EXTRA_DID);
-            String name = intent.getStringExtra(EXTRA_NAME);
             int widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                     AppWidgetManager.INVALID_APPWIDGET_ID);
 
             if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                 AppWidgetManager.getInstance(context).updateAppWidget(widgetId,
-                        buildViews(context, widgetId, name + " 请求中…"));
+                        buildViews(context, widgetId, "设备启动中…"));
             }
 
             Intent svc = new Intent(context, WaterService.class);
             svc.putExtra(EXTRA_DID, did);
-            svc.putExtra(EXTRA_NAME, name);
             svc.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
             context.startService(svc);
         }
@@ -60,26 +60,21 @@ public class WaterWidgetProvider extends AppWidgetProvider {
             views.setOnClickPendingIntent(android.R.id.background, pi);
             views.setTextViewText(R.id.widget_status, "未配置 · 点击设置");
         } else {
-            String hotDid = WaterApi.getDid(context, "hot");
-            String coldDid = WaterApi.getDid(context, "cold");
-            views.setOnClickPendingIntent(R.id.btn_hot,
-                    buildPI(context, widgetId, 1, ACTION_HOT, hotDid, "热水"));
-            views.setOnClickPendingIntent(R.id.btn_cold,
-                    buildPI(context, widgetId, 2, ACTION_COLD, coldDid, "冷水"));
+            String did = WaterApi.getDid(context);
+            views.setOnClickPendingIntent(R.id.btn_start,
+                    buildPI(context, widgetId, did));
             views.setTextViewText(R.id.widget_status,
-                    status != null ? status : "点击按钮出水");
+                    status != null ? status : "点击启动当前设备");
         }
         return views;
     }
 
-    private static PendingIntent buildPI(Context context, int widgetId, int reqCode,
-                                         String action, String did, String name) {
+    private static PendingIntent buildPI(Context context, int widgetId, String did) {
         Intent intent = new Intent(context, WaterWidgetProvider.class);
-        intent.setAction(action);
+        intent.setAction(ACTION_START);
         intent.putExtra(EXTRA_DID, did);
-        intent.putExtra(EXTRA_NAME, name);
         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
-        return PendingIntent.getBroadcast(context, widgetId * 10 + reqCode, intent,
+        return PendingIntent.getBroadcast(context, widgetId * 10 + 1, intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
     }
 }

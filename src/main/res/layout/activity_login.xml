@@ -161,7 +161,7 @@
             android:text="发送短信验证码"
             android:textColor="#fff"
             android:textSize="15sp"
-            android:background="@drawable/btn_cold_gradient"
+            android:background="@drawable/btn_start_gradient"
             android:stateListAnimator="@null"
             android:layout_marginBottom="16dp" />
 

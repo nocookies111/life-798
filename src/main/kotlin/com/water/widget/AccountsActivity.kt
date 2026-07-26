@@ -21,7 +21,8 @@ import com.water.widget.ui.AccountCardState
 import com.water.widget.ui.AccountsScreen
 import com.water.widget.ui.TextEntryDialog
 import com.water.widget.ui.WaterTheme
-import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 class AccountsActivity : ComponentActivity() {
     private var accounts by mutableStateOf<List<AccountCardState>>(emptyList())
@@ -62,7 +63,7 @@ class AccountsActivity : ComponentActivity() {
             DialogState.AddToken -> TextEntryDialog(
                 title = "手动添加登录信息",
                 message = "登录信息属于敏感内容。请仅在可信环境中粘贴，保存前会在线核验账户。",
-                fields = listOf("手机号" to "", "日常登录信息" to "", "设备控制登录信息（可选）" to ""),
+                fields = listOf("手机号" to "", "积分服务登录" to "", "设备控制登录（可选）" to ""),
                 sensitive = true,
                 onDismiss = { dialog = null },
                 onConfirm = { dialog = null; addByToken(it) }
@@ -70,20 +71,16 @@ class AccountsActivity : ComponentActivity() {
             is DialogState.SetAppToken -> {
                 val account = AccountStore.get(this, state.phone)
                 TextEntryDialog(
-                    title = "设置设备控制登录信息",
+                    title = "设置设备控制登录",
                     message = "这项登录信息用于启用设备控制和官方应用专属服务，请妥善保管。",
-                    fields = listOf("设备控制登录信息" to account?.appToken.orEmpty()),
+                    fields = listOf("设备控制登录" to account?.appToken.orEmpty()),
                     sensitive = true,
                     onDismiss = { dialog = null },
                     onConfirm = { values ->
                         dialog = null
                         val token = values.firstOrNull().orEmpty().trim()
-                        if (account == null || token.isBlank()) toast("登录信息不能为空") else {
-                            account.appToken = token
-                            AccountStore.addOrUpdateKeepingCurrent(this, account)
-                            refresh()
-                            toast("设备控制已开通")
-                        }
+                        if (account == null || token.isBlank()) toast("登录信息不能为空")
+                        else verifyAndSaveTokens(account.phone, "", token, account, setCurrent = false)
                     }
                 )
             }
@@ -92,7 +89,7 @@ class AccountsActivity : ComponentActivity() {
                 val token = if (state.app) account?.appToken.orEmpty() else account?.token.orEmpty()
                 AlertDialog(
                     onDismissRequest = { dialog = null },
-                    title = { Text(if (state.app) "设备控制登录信息" else "日常登录信息") },
+                    title = { Text(if (state.app) "设备控制登录" else "积分服务登录") },
                     text = { Text("这是一段敏感登录信息，请勿发送给他人或粘贴到不可信应用。\n\n$token") },
                     confirmButton = { TextButton(onClick = { copySensitive(token); dialog = null }) { Text("复制登录信息") } },
                     dismissButton = { TextButton(onClick = { dialog = null }) { Text("关闭") } }
@@ -118,10 +115,10 @@ class AccountsActivity : ComponentActivity() {
                 current = account.phone == current,
                 alipayToken = account.token.orEmpty(),
                 appToken = account.appToken.orEmpty(),
-                deviceSummary = buildList {
-                    if (!account.hotDid.isNullOrBlank()) add("热水已分配")
-                    if (!account.coldDid.isNullOrBlank()) add("冷水已分配")
-                }.ifEmpty { listOf("未分配") }.joinToString(" · ")
+                deviceSummary = account.rememberedDevices()
+                    .takeIf { it.isNotEmpty() }
+                    ?.let { "${it.size} 台设备" }
+                    ?: "暂无设备"
             )
         }
     }
@@ -130,24 +127,90 @@ class AccountsActivity : ComponentActivity() {
         val phone = values.getOrElse(0) { "" }.trim()
         val token = values.getOrElse(1) { "" }.trim()
         val appToken = values.getOrElse(2) { "" }.trim()
-        if (phone.isBlank() || token.isBlank()) { toast("手机号和 Token 不能为空"); return }
-        toast("正在验证 Token…")
-        IlifeApi.viewInfoWithToken(token) { json, err ->
-            runOnUiThread {
-                if (json == null || json.optInt("code", -999) != 0) {
-                    toast("验证失败: ${json?.optString("msg") ?: err ?: "未知错误"}")
-                    return@runOnUiThread
+        if (phone.isBlank() || (token.isBlank() && appToken.isBlank())) {
+            toast("请填写手机号和至少一条登录信息")
+            return
+        }
+        verifyAndSaveTokens(phone, token, appToken, null, setCurrent = true)
+    }
+
+    private fun verifyAndSaveTokens(
+        phone: String,
+        mainInput: String,
+        appInput: String,
+        fixedAccount: Account?,
+        setCurrent: Boolean
+    ) {
+        val requested = linkedMapOf<String, MutableSet<ImportedTokenPlatform>>()
+        fun add(token: String, platform: ImportedTokenPlatform) {
+            if (token.isBlank()) return
+            requested.getOrPut(token) { linkedSetOf() } += platform
+        }
+        add(mainInput, ImportedTokenPlatform.MAIN)
+        add(appInput, ImportedTokenPlatform.APP)
+        if (requested.isEmpty()) {
+            toast("登录信息不能为空")
+            return
+        }
+
+        toast("正在核验登录信息…")
+        val inspected = ConcurrentHashMap<String, InspectedToken>()
+        val remaining = AtomicInteger(requested.size)
+        requested.keys.forEach { token ->
+            IlifeApi.probeToken(token) { probe, err ->
+                inspected[token] = TokenImportResolver.inspect(token, probe, err)
+                if (remaining.decrementAndGet() == 0) {
+                    runOnUiThread {
+                        val existing = fixedAccount
+                            ?: AccountStore.get(this, phone)
+                            ?: AccountStore.list(this).firstOrNull { account ->
+                                requested.keys.any { candidate ->
+                                    candidate == account.token || candidate == account.appToken
+                                }
+                            }
+                        val candidates = requested.map { (candidateToken, platforms) ->
+                            TokenImportCandidate(
+                                inspection = inspected.getValue(candidateToken),
+                                requestedPlatforms = platforms
+                            )
+                        }
+                        val resolution = TokenImportResolver.resolve(
+                            candidates = candidates,
+                            expectedPhone = phone,
+                            existingMainToken = existing?.token.orEmpty(),
+                            existingAppToken = existing?.appToken.orEmpty()
+                        )
+                        if (!resolution.success) {
+                            toastLong("验证失败：${resolution.error}")
+                            return@runOnUiThread
+                        }
+
+                        val account = existing ?: Account(phone)
+                        val oldPhone = account.phone.orEmpty()
+                        account.phone = phone
+                        account.token = resolution.mainToken
+                        account.appToken = resolution.appToken
+                        resolution.uid.takeIf(String::isNotBlank)?.let { account.uid = it }
+                        resolution.eid.takeIf(String::isNotBlank)?.let { account.eid = it }
+                        resolution.name.takeIf(String::isNotBlank)?.let { account.name = it }
+                        if (oldPhone.isNotBlank() && oldPhone != phone) {
+                            AccountStore.remove(this, oldPhone)
+                        }
+                        if (setCurrent) AccountStore.addOrUpdate(this, account)
+                        else AccountStore.addOrUpdateKeepingCurrent(this, account)
+                        refresh()
+
+                        val details = buildList {
+                            addAll(resolution.notices)
+                            if (resolution.mainToken.isBlank()) add("仍需补充积分服务登录")
+                            if (resolution.appToken.isBlank()) add("仍需补充设备控制登录")
+                        }.distinct()
+                        toastLong(
+                            if (details.isEmpty()) "登录信息验证并保存成功"
+                            else "已保存：${details.joinToString("；")}"
+                        )
+                    }
                 }
-                val data = json.optJSONObject("data") ?: JSONObject()
-                val account = AccountStore.get(this, phone) ?: Account(phone)
-                account.token = token
-                if (appToken.isNotBlank()) account.appToken = appToken
-                account.uid = data.optString("id", account.uid.orEmpty())
-                account.eid = data.optString("eid", account.eid.orEmpty())
-                data.optString("name").takeIf { it.isNotBlank() }?.let { account.name = it }
-                AccountStore.addOrUpdate(this, account)
-                refresh()
-                toast("账号添加成功")
             }
         }
     }
@@ -160,6 +223,7 @@ class AccountsActivity : ComponentActivity() {
     }
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    private fun toastLong(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 
     private sealed interface DialogState {
         data object AddToken : DialogState

@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-private val DEFAULT_TASK_LOGS = listOf("任务策略已就绪：签到优先、跳过无积分/借贷任务、频率限制自动等待重试。")
+private val DEFAULT_TASK_LOGS = emptyList<String>()
 
 data class DashboardUiState(
     val summary: DashboardSummaryUiState = DashboardUiStateFactory.from(null, 0),
@@ -73,7 +73,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun appendTaskLog(line: String) {
-        taskLogs = (taskLogs + line).takeLast(160)
+        val displayLine = TaskLogFormatter.format(line) ?: return
+        if (taskLogs.lastOrNull() == displayLine) return
+        taskLogs = (taskLogs + displayLine).takeLast(80)
         publish()
     }
 
@@ -103,9 +105,21 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private fun publish() {
         val accounts = AccountStore.list(storeContext)
         val current = AccountStore.getCurrent(storeContext)
+        val usage = current?.let { account ->
+            val accountKey = account.phone?.takeIf(String::isNotBlank)
+                ?: account.uid?.takeIf(String::isNotBlank)
+                ?: return@let WaterUsageUiState()
+            UsageHistoryStore.mergeAndRead(storeContext, accountKey, currentScoreLogs)
+        }
         _uiState.update {
             DashboardUiState(
-                summary = DashboardUiStateFactory.from(current, accounts.size, currentScore, currentScoreLogs),
+                summary = DashboardUiStateFactory.from(
+                    current,
+                    accounts.size,
+                    currentScore,
+                    currentScoreLogs,
+                    usageOverride = usage
+                ),
                 accounts = DashboardUiStateFactory.accountsFrom(accounts, current?.phone),
                 tasks = TaskUiStateFactory.from(accounts, taskRunning, taskGained, taskLogs)
             )

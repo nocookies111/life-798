@@ -63,11 +63,12 @@ class ConfigActivity : ComponentActivity() {
                     onRunTasks = { runTasksInHome() },
                     onScores = { startActivity(Intent(this, ScoreActivity::class.java)) },
                     onSelectAccount = { phone -> switchAccount(phone) },
-                    onFetchDevices = { fetchDevices() },
-                    onAddDevice = { role -> openAddDevice(role) },
-                    onAssignDevice = { role, deviceId -> assignDevice(role, deviceId) },
-                    onHotWater = { testWater("hot", "热水") },
-                    onColdWater = { testWater("cold", "冷水") }
+                    onFetchDevices = { fetchDevices(showFeedback = true) },
+                    onAddDevice = { openAddDevice() },
+                    onEditDevice = { deviceId, alias -> editDevice(deviceId, alias) },
+                    onRemoveDevice = { deviceId -> removeDevice(deviceId) },
+                    onSelectDevice = { deviceId -> selectControlCenterDevice(deviceId) },
+                    onStartDevice = { deviceId -> startDevice(deviceId) }
                 )
             }
         }
@@ -97,6 +98,7 @@ class ConfigActivity : ComponentActivity() {
         viewModel.reloadAccounts(resetScore = true)
         refreshCurrentScore()
         updateWidgets()
+        fetchDevices(showFeedback = false)
     }
 
     override fun onDestroy() {
@@ -433,78 +435,103 @@ class ConfigActivity : ComponentActivity() {
         }
     }
 
-    private fun openAddDevice(role: String) {
-        val assignment = when (role) {
-            "hot" -> DeviceAssignment.HOT.name
-            "cold" -> DeviceAssignment.COLD.name
-            else -> DeviceAssignment.BOTH.name
-        }
-        addDevice.launch(Intent(this, DeviceAddActivity::class.java).putExtra(DeviceAddActivity.EXTRA_ASSIGNMENT, assignment))
+    private fun openAddDevice() {
+        addDevice.launch(Intent(this, DeviceAddActivity::class.java))
     }
 
-    private fun assignDevice(role: String, deviceId: String) {
+    private fun editDevice(deviceId: String, alias: String) {
         val account = AccountStore.getCurrent(this)
-        if (account == null) {
-            toast("请先登录")
+        if (account == null || deviceId.isBlank()) return
+        account.setDeviceAlias(deviceId, alias)
+        AccountStore.updateCurrent(this, account)
+        viewModel.reloadAccounts()
+        toast("设备名称已保存")
+    }
+
+    private fun removeDevice(deviceId: String) {
+        val account = AccountStore.getCurrent(this)
+        if (account == null || deviceId.isBlank()) return
+        IlifeApi.deviceFavorite(this, deviceId, true) { _, err ->
+            runOnUiThread {
+                if (destroyed) return@runOnUiThread
+                if (err != null && err != "TOKEN_EXPIRED") {
+                    toast("移除失败：$err")
+                    return@runOnUiThread
+                }
+                account.forgetDevice(deviceId)
+                AccountStore.updateCurrent(this, account)
+                viewModel.reloadAccounts()
+                updateWidgets()
+                toast(if (err == "TOKEN_EXPIRED") "已从本地移除；登录过期，服务器收藏可能仍保留" else "设备已移除")
+            }
+        }
+    }
+
+    private fun selectControlCenterDevice(deviceId: String) {
+        val account = AccountStore.getCurrent(this)
+        if (account == null || deviceId.isBlank()) return
+        if (account.selectedDeviceId() == deviceId) {
+            toast("已是控制中心默认设备")
             return
         }
-        if (deviceId.isBlank()) return
-        if (role == "hot") account.hotDid = deviceId else account.coldDid = deviceId
-        account.rememberDevice(deviceId)
+        account.selectDevice(deviceId)
         AccountStore.updateCurrent(this, account)
         viewModel.reloadAccounts()
         updateWidgets()
-        toast("已将 $deviceId 设为${if (role == "hot") "热水" else "冷水"}设备")
+        toast("已设为控制中心默认设备")
     }
 
-    /** 拉取主页数据，把收藏设备列表写入当前账户，自动分配前两个为热/冷水。 */
-    private fun fetchDevices() {
+    /** 拉取主页收藏设备列表；首次同步时自动选择第一台设备。 */
+    private fun fetchDevices(showFeedback: Boolean) {
         val account = AccountStore.getCurrent(this)
-        if (account == null || !account.hasToken()) {
-            toast("请先登录")
+        if (account == null || (!account.hasToken() && !account.hasAppToken())) {
+            if (showFeedback) toast("请先登录")
             return
         }
 
-        toast("拉取设备列表中...")
+        if (showFeedback) toast("正在同步设备…")
         IlifeApi.master(this, object : IlifeApi.JsonCallback {
             override fun onResult(json: org.json.JSONObject?, err: String?) {
                 runOnUiThread {
                     if (destroyed) return@runOnUiThread
                     if (json == null) {
-                        toast("拉取失败: ${err ?: "未知错误"}")
+                        if (showFeedback) toast("同步失败：${err ?: "未知错误"}")
                         return@runOnUiThread
                     }
 
                     val code = json.optInt("code", -999)
                     when {
                         code == -99 -> {
-                            toast("登录已过期，请重新登录")
+                            if (showFeedback) toast("登录已过期，请重新登录")
                             return@runOnUiThread
                         }
                         code != 0 -> {
-                            toast("拉取失败: code=$code")
+                            if (showFeedback) toast("同步失败：code=$code")
                             return@runOnUiThread
                         }
                     }
 
                     val favos = json.optJSONObject("data")?.optJSONArray("favos")
                     if (favos == null || favos.length() == 0) {
-                        toast("服务器未返回设备列表，请手动在账户管理中填写")
+                        if (showFeedback) toast("暂无已收藏设备")
                         return@runOnUiThread
                     }
 
-                    account.hotDid = favos.optJSONObject(0)?.optString("id", "") ?: ""
-                    account.coldDid = if (favos.length() >= 2) {
-                        favos.optJSONObject(1)?.optString("id", "") ?: ""
-                    } else {
-                        account.hotDid
-                    }
+                    val devices = mutableListOf<Pair<String, String>>()
                     for (index in 0 until favos.length()) {
-                        account.rememberDevice(favos.optJSONObject(index)?.optString("id", "").orEmpty())
+                        favos.optJSONObject(index)?.let { device ->
+                            device.optString("id", "").takeIf(String::isNotBlank)?.let { id ->
+                                devices += id to device.optString("name", "")
+                            }
+                        }
+                    }
+                    devices.asReversed().forEach { (id, name) -> account.rememberDevice(id, name) }
+                    if (account.selectedDeviceId().isBlank()) {
+                        devices.firstOrNull()?.first?.let(account::selectDevice)
                     }
 
                     AccountStore.updateCurrent(this@ConfigActivity, account)
-                    toast(if (favos.length() == 1) "已分配 1 个设备（热/冷水共用）" else "已分配 ${favos.length()} 个设备")
+                    if (showFeedback) toast("已同步 ${devices.size} 台设备")
                     viewModel.reloadAccounts()
                     updateWidgets()
                 }
@@ -512,25 +539,24 @@ class ConfigActivity : ComponentActivity() {
         })
     }
 
-    private fun testWater(which: String, name: String) {
+    private fun startDevice(deviceId: String) {
         val account = AccountStore.getCurrent(this)
         if (account == null) {
             toast("请先登录")
             return
         }
         if (!account.hasAppToken()) {
-            toast("出水需要设备控制登录信息，请在账户管理中补充")
+            toast("启动设备需要设备控制登录信息，请在账户管理中补充")
             return
         }
 
-        val did = if (which == "hot") account.hotOrFallback() else account.coldOrFallback()
-        if (did.isNullOrBlank()) {
-            toast("未分配 $name 设备")
+        if (deviceId.isBlank()) {
+            toast("请先选择设备")
             return
         }
 
-        toast("$name 请求中...")
-        WaterApi.start(this, did, name) { status ->
+        toast("设备启动中...")
+        WaterApi.start(this, deviceId) { status ->
             runOnUiThread {
                 if (!destroyed) toast(status)
             }

@@ -9,17 +9,15 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.water.widget.ui.LoginPlatform
-import com.water.widget.ui.LoginPurpose
 import com.water.widget.ui.LoginScreen
 import com.water.widget.ui.LoginUiStateFactory
 import com.water.widget.ui.WaterTheme
 import org.json.JSONObject
 
 /**
- * Compose 版登录页：引导用户选择账户统计或设备控制所需的登录方式。
+ * Compose 版登录页：选择积分服务或设备控制并完成短信验证。
  */
 class LoginActivity : ComponentActivity() {
-    private var purpose = LoginPurpose.ALL_IN_ONE
     private var platform = LoginPlatform.ALIPAY
     private var phone = ""
     private var graphCode = ""
@@ -39,13 +37,12 @@ class LoginActivity : ComponentActivity() {
         setContent {
             WaterTheme(mode = ThemeSettings.mode(this)) {
                 LoginScreen(
-                    state = LoginUiStateFactory.from(purpose, platform, captchaBitmap != null, smsSent, phone, graphCode, smsCode),
+                    state = LoginUiStateFactory.from(platform, captchaBitmap != null, smsSent, phone, graphCode, smsCode),
                     phone = phone,
                     graphCode = graphCode,
                     smsCode = smsCode,
                     captchaBitmap = captchaBitmap,
                     loading = loading,
-                    onPurposeChange = { changePurpose(it) },
                     onPlatformChange = { platform = it; smsSent = false; render() },
                     onPhoneChange = { phone = it.trim(); smsSent = false; render() },
                     onGraphCodeChange = { graphCode = it.trim(); render() },
@@ -56,17 +53,6 @@ class LoginActivity : ComponentActivity() {
                 )
             }
         }
-    }
-
-    private fun changePurpose(newPurpose: LoginPurpose) {
-        purpose = newPurpose
-        platform = when (newPurpose) {
-            LoginPurpose.SCORE_ONLY -> LoginPlatform.ALIPAY
-            LoginPurpose.WATER_CONTROL -> LoginPlatform.APP
-            LoginPurpose.ALL_IN_ONE -> platform
-        }
-        smsSent = false
-        render()
     }
 
     private fun loadCaptcha() {
@@ -165,7 +151,7 @@ class LoginActivity : ComponentActivity() {
         if (TextUtils.isEmpty(account.eid)) account.eid = loginData.optString("eid")
         AccountStore.addOrUpdate(this, account)
         fetchUidAsync(phone, newToken)
-        toast(if (platform == LoginPlatform.APP) "设备控制登录信息已保存" else "日常登录信息已保存")
+        toast(if (platform == LoginPlatform.APP) "设备控制登录已保存" else "积分服务登录已保存")
         setResult(Activity.RESULT_OK)
         finish()
     }

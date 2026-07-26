@@ -7,31 +7,29 @@ import org.junit.Test
 
 class LoginUiStateFactoryTest {
     @Test
-    fun `积分任务模式推荐日常服务登录`() {
-        val state = LoginUiStateFactory.from(LoginPurpose.SCORE_ONLY, LoginPlatform.ALIPAY, false, false)
+    fun `积分服务登录展示精简文案`() {
+        val state = LoginUiStateFactory.from(LoginPlatform.ALIPAY, false, false, "13800000000", "", "")
 
-        assertEquals("积分任务", state.purposeTitle)
-        assertEquals("日常服务登录", state.platformTitle)
+        assertEquals("积分服务", state.platformTitle)
+        assertEquals("保存积分服务登录", state.actionLabel)
         assertTrue(state.canLoadCaptcha)
         assertFalse(state.canSendSms)
         assertFalse(state.canLogin)
     }
 
     @Test
-    fun `设备控制模式推荐设备控制登录`() {
-        val state = LoginUiStateFactory.from(LoginPurpose.WATER_CONTROL, LoginPlatform.APP, true, true)
+    fun `设备控制登录使用对应保存按钮`() {
+        val state = LoginUiStateFactory.from(LoginPlatform.APP, true, true, "13800000000", "1234", "1234")
 
-        assertEquals("设备控制", state.purposeTitle)
-        assertEquals("设备控制登录", state.platformTitle)
-        assertTrue(state.canLoadCaptcha)
+        assertEquals("设备控制", state.platformTitle)
+        assertEquals("保存设备控制登录", state.actionLabel)
         assertTrue(state.canSendSms)
         assertTrue(state.canLogin)
     }
 
     @Test
-    fun `手机号无效时不能加载图形验证码`() {
+    fun `手机号无效时不能刷新图形验证码`() {
         val state = LoginUiStateFactory.from(
-            purpose = LoginPurpose.ALL_IN_ONE,
             platform = LoginPlatform.ALIPAY,
             captchaLoaded = false,
             smsSent = false,
@@ -46,10 +44,10 @@ class LoginUiStateFactoryTest {
     }
 
     @Test
-    fun `验证码为空时不能发送短信 短信为空时不能登录`() {
-        val noGraph = LoginUiStateFactory.from(LoginPurpose.ALL_IN_ONE, LoginPlatform.ALIPAY, true, false, "13800000000", "", "")
-        val noSms = LoginUiStateFactory.from(LoginPurpose.ALL_IN_ONE, LoginPlatform.ALIPAY, true, true, "13800000000", "1234", "")
-        val ready = LoginUiStateFactory.from(LoginPurpose.ALL_IN_ONE, LoginPlatform.ALIPAY, true, true, "13800000000", "1234", "5678")
+    fun `验证码为空时不能发送短信或登录`() {
+        val noGraph = LoginUiStateFactory.from(LoginPlatform.ALIPAY, true, false, "13800000000", "", "")
+        val noSms = LoginUiStateFactory.from(LoginPlatform.ALIPAY, true, true, "13800000000", "1234", "")
+        val ready = LoginUiStateFactory.from(LoginPlatform.ALIPAY, true, true, "13800000000", "1234", "5678")
 
         assertFalse(noGraph.canSendSms)
         assertFalse(noSms.canLogin)

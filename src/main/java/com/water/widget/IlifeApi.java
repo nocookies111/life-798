@@ -26,7 +26,7 @@ public class IlifeApi {
     static final String GATEWAY = BuildConfig.API_GATEWAY;
     static final String CID = BuildConfig.API_CID;
     private static final String SIGN_SALT = BuildConfig.SIGN_SALT;
-    private static final String UA = "WaterWidget/5.0.0 (Android)";
+    private static final String UA = "WaterWidget/" + BuildConfig.VERSION_NAME + " (Android)";
 
     public interface ImgCallback {
         void onResult(byte[] bytes, String err);
@@ -175,6 +175,32 @@ public class IlifeApi {
         }).start();
     }
 
+    /**
+     * 只读探测一条手动导入的登录信息。
+     * 同时检查两种请求头下的账户信息、任务目录和设备首页，供本地判断登录平台。
+     */
+    public static void probeToken(final String token, final JsonCallback cb) {
+        new Thread(() -> {
+            JSONObject result = new JSONObject();
+            String firstError = null;
+            String[][] requests = new String[][] {
+                    {"viewMain", "/acc/view-info", "1,5"},
+                    {"viewApp", "/acc/view-info", "1,1"},
+                    {"missionMain", "/acc/score/mission-lst", "1,5"},
+                    {"masterApp", "/ui/app/master", "1,1"}
+            };
+            for (String[] request : requests) {
+                try {
+                    String body = httpRawApp("GET", GATEWAY + request[1], null, token, request[2]);
+                    result.put(request[0], new JSONObject(body));
+                } catch (Exception e) {
+                    if (firstError == null) firstError = e.getMessage();
+                }
+            }
+            cb.onResult(result, firstError);
+        }).start();
+    }
+
     /** 用指定 token 获取积分明细。 */
     public static void scoreLstWithToken(final String token, final JsonCallback cb) {
         new Thread(() -> {
@@ -285,7 +311,18 @@ public class IlifeApi {
     // ====== 设备 ======
 
     public static void master(Context ctx, final JsonCallback cb) {
-        get(ctx, "/ui/app/master", cb);
+        new Thread(() -> {
+            Account acc = AccountStore.getCurrent(ctx);
+            boolean useApp = acc != null && acc.hasAppToken();
+            String token = acc == null ? "" : (useApp ? acc.appToken : acc.token);
+            String appType = useApp ? "1,1" : "1,5";
+            try {
+                String body = httpRawApp("GET", GATEWAY + "/ui/app/master", null, token, appType);
+                cb.onResult(new JSONObject(body), null);
+            } catch (Exception e) {
+                cb.onResult(null, e.getMessage());
+            }
+        }).start();
     }
 
     public static void devStart(Context ctx, final String did, final TextCallback cb) {
@@ -356,6 +393,36 @@ public class IlifeApi {
                     cb.onResult(null, "TOKEN_EXPIRED");
                 } else {
                     cb.onResult(null, "code=" + code);
+                }
+            } catch (Exception e) {
+                cb.onResult(null, e.getMessage());
+            }
+        }).start();
+    }
+
+    /** 添加或移除账户收藏设备。remove=true 表示移除。 */
+    public static void deviceFavorite(Context ctx, final String did, final boolean remove,
+                                      final TextCallback cb) {
+        new Thread(() -> {
+            Account acc = AccountStore.getCurrent(ctx);
+            if (acc == null || (!acc.hasToken() && !acc.hasAppToken())) {
+                cb.onResult(null, "未登录");
+                return;
+            }
+            boolean useApp = acc.hasAppToken();
+            String token = useApp ? acc.appToken : acc.token;
+            String appType = useApp ? "1,1" : "1,5";
+            String url = GATEWAY + "/dev/favo?did=" + enc(did) + "&remove=" + (remove ? "1" : "0");
+            try {
+                JSONObject json = new JSONObject(httpRawApp("GET", url, null, token, appType));
+                int code = json.optInt("code", -999);
+                if (code == 0) {
+                    cb.onResult(remove ? "已移除" : "已添加", null);
+                } else if (code == -99) {
+                    cb.onResult(null, "TOKEN_EXPIRED");
+                } else {
+                    String msg = json.optString("msg", "");
+                    cb.onResult(null, msg.isEmpty() ? "code=" + code : msg);
                 }
             } catch (Exception e) {
                 cb.onResult(null, e.getMessage());

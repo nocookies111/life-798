@@ -111,8 +111,9 @@ public class AccountStore {
         if (!token.isEmpty()) {
             Account a = new Account("已导入的账户");
             a.token = token;
-            a.hotDid = hot;
-            a.coldDid = cold;
+            a.rememberDevice(cold);
+            a.rememberDevice(hot);
+            a.selectDevice(!hot.isEmpty() ? hot : cold);
             a.name = "已导入的账户";
             addOrUpdate(ctx, a);
         }

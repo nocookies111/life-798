@@ -13,17 +13,17 @@ public class WaterApi {
         void onResult(String status);
     }
 
-    /** 出水。which = "hot" 或 "cold"。 */
-    public static void start(Context ctx, final String did, final String name, final Callback cb) {
+    /** 启动指定饮水设备。水温由设备上的实体按钮决定。 */
+    public static void start(Context ctx, final String did, final Callback cb) {
         IlifeApi.devStart(ctx, did, new IlifeApi.TextCallback() {
             @Override
             public void onResult(String text, String err) {
                 if (text != null) {
-                    cb.onResult(name + " " + text);
+                    cb.onResult("设备 " + text);
                 } else if ("TOKEN_EXPIRED".equals(err)) {
-                    cb.onResult(name + " 失败：登录已过期，请重新登录");
+                    cb.onResult("启动失败：登录已过期，请重新登录");
                 } else {
-                    cb.onResult(name + " 失败：" + err);
+                    cb.onResult("启动失败：" + err);
                 }
             }
         });
@@ -34,11 +34,9 @@ public class WaterApi {
         return a != null ? a.token : "";
     }
 
-    static String getDid(Context ctx, String which) {
+    static String getDid(Context ctx) {
         Account a = AccountStore.getCurrent(ctx);
-        if (a == null) return "";
-        if ("hot".equals(which)) return a.hotOrFallback();
-        return a.coldOrFallback();
+        return a != null ? a.selectedDeviceId() : "";
     }
 
     public static boolean isConfigured(Context ctx) {

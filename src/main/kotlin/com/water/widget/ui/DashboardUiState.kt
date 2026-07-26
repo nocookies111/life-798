@@ -13,11 +13,15 @@ data class DashboardSummaryUiState(
     val hasAccount: Boolean,
     val hasAppToken: Boolean,
     val hasDevices: Boolean,
-    val hotDevice: String,
-    val coldDevice: String,
     val accountCount: Int,
-    val recentDevices: List<String> = emptyList(),
+    val devices: List<DeviceUiState> = emptyList(),
     val usage: WaterUsageUiState = WaterUsageUiState()
+)
+
+data class DeviceUiState(
+    val id: String,
+    val name: String,
+    val isControlCenterDevice: Boolean = false
 )
 
 data class WaterUsageUiState(
@@ -43,21 +47,20 @@ object DashboardUiStateFactory {
         account: Account?,
         accountCount: Int,
         validScore: Int? = null,
-        scoreJson: JSONObject? = null
+        scoreJson: JSONObject? = null,
+        usageOverride: WaterUsageUiState? = null
     ): DashboardSummaryUiState {
         if (account == null) {
             return DashboardSummaryUiState(
                 accountTitle = "未登录",
-                accountSubtitle = "登录后可完成积分任务、同步设备并查看用水统计",
+                accountSubtitle = "登录后使用设备与积分服务",
                 scoreTitle = "--",
                 scoreSubtitle = "暂无积分",
                 hasAccount = false,
                 hasAppToken = false,
                 hasDevices = false,
-                hotDevice = "未分配",
-                coldDevice = "未分配",
                 accountCount = accountCount,
-                recentDevices = emptyList(),
+                devices = emptyList(),
                 usage = WaterUsageUiState()
             )
         }
@@ -67,27 +70,23 @@ object DashboardUiStateFactory {
             ?: "已登录账户"
         val hasAppToken = account.hasAppToken()
         val hasDevices = account.hasDevices()
-        val hot = account.hotOrFallback()?.takeIf { it.isNotBlank() } ?: "未分配"
-        val rawCold = account.coldOrFallback()?.takeIf { it.isNotBlank() }
-        val cold = when {
-            rawCold.isNullOrBlank() -> "未分配"
-            rawCold == hot -> "共用热水设备"
-            else -> rawCold
-        }
-
         return DashboardSummaryUiState(
             accountTitle = title,
-            accountSubtitle = "$accountCount 个账户 · ${if (hasAppToken) "设备控制已开通" else "设备控制待开通"}",
+            accountSubtitle = if (hasAppToken) "设备控制已连接" else "设备控制未登录",
             scoreTitle = validScore?.toString() ?: "刷新中",
             scoreSubtitle = validScore?.let { "≈${String.format(java.util.Locale.CHINA, "%.2f", it / 1000.0)}元可用" } ?: "当前账号积分",
             hasAccount = true,
             hasAppToken = hasAppToken,
             hasDevices = hasDevices,
-            hotDevice = hot,
-            coldDevice = cold,
             accountCount = accountCount,
-            recentDevices = account.rememberedDevices(),
-            usage = usageFrom(scoreJson)
+            devices = account.rememberedDevices().map { id ->
+                DeviceUiState(
+                    id = id,
+                    name = account.deviceDisplayName(id),
+                    isControlCenterDevice = id == account.selectedDeviceId()
+                )
+            },
+            usage = usageOverride ?: usageFrom(scoreJson)
         )
     }
 
@@ -162,16 +161,16 @@ object DashboardUiStateFactory {
                 phone = account.phone.orEmpty(),
                 title = account.name?.takeIf { it.isNotBlank() } ?: account.phone?.takeIf { it.isNotBlank() } ?: "未命名账号",
                 subtitle = when {
-                    account.hasToken() && account.hasAppToken() -> "日常服务和设备控制均可使用"
-                    account.hasToken() -> "可查看积分并完成日常任务"
+                    account.hasToken() && account.hasAppToken() -> "积分与设备服务均已连接"
+                    account.hasToken() -> "积分服务已连接"
                     account.hasAppToken() -> "可使用设备控制"
                     else -> "需要重新登录或补充登录信息"
                 },
                 tokenSummary = buildList {
-                    add(if (account.hasToken()) "日常服务已开通" else "日常服务待开通")
-                    add(if (account.hasAppToken()) "设备控制已开通" else "设备控制待开通")
+                    add(if (account.hasToken()) "积分服务已连接" else "积分服务未登录")
+                    add(if (account.hasAppToken()) "设备控制已连接" else "设备控制未登录")
                 }.joinToString(" · "),
-                deviceSummary = if (account.hasDevices()) "设备已分配" else "未分配设备",
+                deviceSummary = if (account.hasDevices()) "${account.rememberedDevices().size} 台设备" else "暂无设备",
                 isCurrent = account.phone == currentPhone
             )
         }

@@ -67,10 +67,7 @@ fun TaskScreen(
         modifier = modifier.fillMaxWidth().background(Color.Transparent),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("积分任务", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-            Text("为已登录账号完成每日签到和日常任务", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Text("积分任务", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
 
         Card(
             shape = RoundedCornerShape(24.dp),
@@ -79,21 +76,20 @@ fun TaskScreen(
         ) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("今日任务", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            if (state.running) "正在逐个处理可执行账号" else state.summary,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp
-                        )
-                    }
+                    Text("今日任务", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     if (state.running) CircularProgressIndicator(strokeWidth = 3.dp, modifier = Modifier.height(24.dp))
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Metric("账号", state.totalAccounts.toString())
-                    Metric("可执行", state.runnableAccounts.toString())
-                    Metric("双平台", state.dualPlatformAccounts.toString())
-                    Metric("已获得", state.totalGainedText)
+                Text(
+                    if (state.running) "正在执行…" else state.summary,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.sp
+                )
+                if (state.totalGainedText != "0") {
+                    Text(
+                        "本次获得 ${state.totalGainedText} 积分",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
                 if (state.running) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                 Button(onClick = onRun, enabled = state.canRun, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp)) {
@@ -101,8 +97,6 @@ fun TaskScreen(
                 }
             }
         }
-
-        TaskPolicyCard()
 
         Card(
             shape = RoundedCornerShape(24.dp),
@@ -116,9 +110,9 @@ fun TaskScreen(
                         Text(
                             when {
                                 visibleLogs.isEmpty() && onlyFailures -> "没有失败记录"
-                                visibleLogs.isEmpty() -> "尚未产生运行记录"
-                                onlyFailures -> "显示 ${visibleLogs.size} 条失败记录"
-                                else -> "显示最近 ${visibleLogs.size} 条记录"
+                                visibleLogs.isEmpty() -> "暂无记录"
+                                onlyFailures -> "${visibleLogs.size} 条失败记录"
+                                else -> "最近 ${visibleLogs.size} 条"
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             fontSize = 12.sp
@@ -137,7 +131,7 @@ fun TaskScreen(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 if (visibleLogs.isEmpty()) {
                     Text(
-                        if (onlyFailures) "本次筛选下没有需要关注的失败项。" else "执行任务后，每个账号的关键结果会显示在这里。",
+                        if (onlyFailures) "没有失败记录" else "运行任务后显示结果",
                         modifier = Modifier.padding(18.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
@@ -153,20 +147,6 @@ fun TaskScreen(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun TaskPolicyCard() {
-    Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("执行说明", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-            Text("每日签到会优先完成；多个账号会依次处理，遇到访问频繁时会自动稍后再试。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 20.sp)
         }
     }
 }
@@ -215,12 +195,4 @@ private fun logStyle(line: String): TaskLogStyle = when {
         MaterialTheme.colorScheme.onSurfaceVariant,
         MaterialTheme.colorScheme.surfaceVariant
     )
-}
-
-@Composable
-private fun Metric(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Text(label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
 }

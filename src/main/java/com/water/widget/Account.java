@@ -5,12 +5,14 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 账户数据模型。对应一次 /acc/login 成功后的会话。
- * 每个账户独立保存 token、用户信息、以及分配的热/冷水设备 ID。
+ * 每个账户独立保存 token、用户信息、当前设备及最近使用的设备。
  */
 public class Account {
     public String phone;
@@ -19,10 +21,13 @@ public class Account {
     public String uid;
     public String eid;
     public String name;
-    public String hotDid;
-    public String coldDid;
-    /** 当前账户曾使用过的设备，供首页快速切换。 */
+    public String deviceId;
+    /** 当前账户的设备列表。 */
     public List<String> recentDeviceIds = new ArrayList<>();
+    /** 服务端返回的设备名称。 */
+    public Map<String, String> deviceNames = new LinkedHashMap<>();
+    /** 用户在本地设置的设备别名。 */
+    public Map<String, String> deviceAliases = new LinkedHashMap<>();
 
     public Account() {}
 
@@ -39,9 +44,10 @@ public class Account {
             o.put("uid", n(uid));
             o.put("eid", n(eid));
             o.put("name", n(name));
-            o.put("hotDid", n(hotDid));
-            o.put("coldDid", n(coldDid));
+            o.put("deviceId", n(deviceId));
             o.put("recentDeviceIds", new JSONArray(recentDeviceIds));
+            o.put("deviceNames", mapJson(deviceNames));
+            o.put("deviceAliases", mapJson(deviceAliases));
         } catch (JSONException ignored) {}
         return o;
     }
@@ -54,14 +60,21 @@ public class Account {
         a.uid = o.optString("uid", "");
         a.eid = o.optString("eid", "");
         a.name = o.optString("name", "");
-        a.hotDid = o.optString("hotDid", "");
-        a.coldDid = o.optString("coldDid", "");
+        a.deviceId = o.optString("deviceId", "");
+        readMap(o.optJSONObject("deviceNames"), a.deviceNames);
+        readMap(o.optJSONObject("deviceAliases"), a.deviceAliases);
+        String legacyHotDid = o.optString("hotDid", "");
+        String legacyColdDid = o.optString("coldDid", "");
         JSONArray recent = o.optJSONArray("recentDeviceIds");
         if (recent != null) {
             for (int i = 0; i < recent.length(); i++) a.rememberDevice(recent.optString(i, ""));
         }
-        a.rememberDevice(a.hotDid);
-        a.rememberDevice(a.coldDid);
+        a.rememberDevice(legacyColdDid);
+        a.rememberDevice(legacyHotDid);
+        if (!notEmpty(a.deviceId)) {
+            a.deviceId = notEmpty(legacyHotDid) ? legacyHotDid : legacyColdDid;
+        }
+        a.rememberDevice(a.deviceId);
         return a;
     }
 
@@ -75,35 +88,73 @@ public class Account {
         return appToken != null && !appToken.isEmpty();
     }
 
-    /** 是否已分配好出水设备（至少有一个设备即可）。 */
+    /** 是否已选择出水设备。 */
     public boolean hasDevices() {
-        return notEmpty(hotDid) || notEmpty(coldDid);
+        return notEmpty(selectedDeviceId());
     }
 
-    /** 取热水 did，没有则用冷水 did。 */
-    public String hotOrFallback() {
-        return notEmpty(hotDid) ? hotDid : coldDid;
+    /** 当前选择的设备；旧数据缺少显式选择时回退到最近设备。 */
+    public String selectedDeviceId() {
+        if (notEmpty(deviceId)) return deviceId;
+        if (recentDeviceIds != null) {
+            for (String id : recentDeviceIds) {
+                if (notEmpty(id)) return id;
+            }
+        }
+        return "";
     }
 
-    /** 取冷水 did，没有则用热水 did。 */
-    public String coldOrFallback() {
-        return notEmpty(coldDid) ? coldDid : hotDid;
+    /** 选择设备，并将它移到最近设备列表首位。 */
+    public void selectDevice(String selectedDeviceId) {
+        if (!notEmpty(selectedDeviceId)) return;
+        deviceId = selectedDeviceId;
+        rememberDevice(selectedDeviceId);
     }
 
-    /** 记录设备，保留最近使用的 12 台，方便从首页快速指定。 */
+    /** 记录设备，不限制界面可展示的设备数量。 */
     public void rememberDevice(String deviceId) {
+        rememberDevice(deviceId, "");
+    }
+
+    /** 记录设备，并更新服务端返回的名称。 */
+    public void rememberDevice(String deviceId, String deviceName) {
         if (!notEmpty(deviceId)) return;
         LinkedHashSet<String> unique = new LinkedHashSet<>();
         unique.add(deviceId);
         if (recentDeviceIds != null) unique.addAll(recentDeviceIds);
         recentDeviceIds = new ArrayList<>(unique);
-        if (recentDeviceIds.size() > 12) recentDeviceIds = new ArrayList<>(recentDeviceIds.subList(0, 12));
+        if (notEmpty(deviceName)) deviceNames.put(deviceId, clean(deviceName));
+    }
+
+    public String deviceDisplayName(String deviceId) {
+        String alias = deviceAliases.get(deviceId);
+        if (notEmpty(alias)) return clean(alias);
+        String officialName = deviceNames.get(deviceId);
+        if (notEmpty(officialName)) return clean(officialName);
+        String suffix = deviceId == null ? "" : deviceId.substring(Math.max(0, deviceId.length() - 6));
+        return suffix.isEmpty() ? "未命名设备" : "设备 " + suffix;
+    }
+
+    public void setDeviceAlias(String deviceId, String alias) {
+        if (!notEmpty(deviceId)) return;
+        String cleaned = clean(alias);
+        if (cleaned.isEmpty()) deviceAliases.remove(deviceId);
+        else deviceAliases.put(deviceId, cleaned);
+    }
+
+    public void forgetDevice(String forgottenDeviceId) {
+        if (!notEmpty(forgottenDeviceId)) return;
+        if (recentDeviceIds != null) recentDeviceIds.remove(forgottenDeviceId);
+        deviceNames.remove(forgottenDeviceId);
+        deviceAliases.remove(forgottenDeviceId);
+        if (forgottenDeviceId.equals(deviceId)) {
+            deviceId = recentDeviceIds == null || recentDeviceIds.isEmpty() ? "" : recentDeviceIds.get(0);
+        }
     }
 
     public List<String> rememberedDevices() {
         LinkedHashSet<String> unique = new LinkedHashSet<>();
-        if (notEmpty(hotDid)) unique.add(hotDid);
-        if (notEmpty(coldDid)) unique.add(coldDid);
+        if (notEmpty(selectedDeviceId())) unique.add(selectedDeviceId());
         if (recentDeviceIds != null) unique.addAll(recentDeviceIds);
         return new ArrayList<>(unique);
     }
@@ -114,6 +165,28 @@ public class Account {
 
     private static String n(String s) {
         return s == null ? "" : s;
+    }
+
+    private static JSONObject mapJson(Map<String, String> values) throws JSONException {
+        JSONObject out = new JSONObject();
+        if (values != null) {
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                if (notEmpty(entry.getKey()) && notEmpty(entry.getValue())) {
+                    out.put(entry.getKey(), entry.getValue());
+                }
+            }
+        }
+        return out;
+    }
+
+    private static void readMap(JSONObject json, Map<String, String> out) {
+        if (json == null) return;
+        java.util.Iterator<String> keys = json.keys();
+        while (keys.hasNext()) {
+            String key = keys.next();
+            String value = json.optString(key, "");
+            if (notEmpty(key) && notEmpty(value)) out.put(key, value);
+        }
     }
 
     @Override

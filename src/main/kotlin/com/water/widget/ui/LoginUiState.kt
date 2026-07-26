@@ -1,23 +1,15 @@
 package com.water.widget.ui
 
-enum class LoginPurpose(val title: String, val description: String) {
-    SCORE_ONLY("积分任务", "登录后可完成每日签到、日常任务并查看积分明细"),
-    WATER_CONTROL("设备控制", "登录后可使用热水、冷水等设备控制，也能补充官方应用专属任务"),
-    ALL_IN_ONE("都需要", "完成两种登录后，可使用积分和设备控制的完整服务")
-}
-
-enum class LoginPlatform(val title: String, val description: String) {
-    ALIPAY("日常服务登录", "用于签到、积分任务和积分看板；登录信息可能会定期失效"),
-    APP("设备控制登录", "用于热水、冷水等设备控制，也可获取官方应用专属任务")
+enum class LoginPlatform(val title: String, val description: String, val actionLabel: String) {
+    ALIPAY("积分服务", "积分、签到与日常任务", "保存积分服务登录"),
+    APP("设备控制", "设备启动与应用任务", "保存设备控制登录")
 }
 
 data class LoginUiState(
-    val purpose: LoginPurpose,
     val platform: LoginPlatform,
-    val purposeTitle: String,
-    val purposeDescription: String,
     val platformTitle: String,
     val platformDescription: String,
+    val actionLabel: String,
     val nextHint: String,
     val canLoadCaptcha: Boolean,
     val canSendSms: Boolean,
@@ -26,27 +18,24 @@ data class LoginUiState(
 
 object LoginUiStateFactory {
     fun from(
-        purpose: LoginPurpose,
         platform: LoginPlatform,
         captchaLoaded: Boolean,
         smsSent: Boolean,
-        phone: String = "13800000000",
-        graphCode: String = "1234",
-        smsCode: String = "1234"
+        phone: String,
+        graphCode: String,
+        smsCode: String
     ): LoginUiState {
         val nextHint = when {
-            !captchaLoaded -> "第 1 步：输入手机号并加载图形验证码"
-            !smsSent -> "第 2 步：填写图形验证码并发送短信"
-            else -> "第 3 步：输入短信验证码完成登录"
+            !captchaLoaded -> "输入手机号并刷新图形验证码"
+            !smsSent -> "填写图形验证码并获取短信"
+            else -> "填写短信验证码"
         }
 
         return LoginUiState(
-            purpose = purpose,
             platform = platform,
-            purposeTitle = purpose.title,
-            purposeDescription = purpose.description,
             platformTitle = platform.title,
             platformDescription = platform.description,
+            actionLabel = platform.actionLabel,
             nextHint = nextHint,
             canLoadCaptcha = phone.matches(Regex("^1\\d{10}$")),
             canSendSms = captchaLoaded && graphCode.isNotBlank(),

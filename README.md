@@ -1,17 +1,32 @@
 # WaterWidget
 
-WaterWidget 是一个面向慧生活798用户的第三方 Android 设备控制客户端，提供多账户管理、热水/冷水设备切换、用水消费统计、桌面小部件、快捷设置磁贴与设备二维码添加功能。
+WaterWidget 是一个面向慧生活798用户的第三方 Android 设备控制客户端，提供多账户管理、饮水设备启动、用水消费统计、桌面小部件、快捷设置磁贴与设备二维码添加功能。
 
 > 非官方项目，与慧生活798服务提供方无关。请仅使用你本人有权访问的账户和设备，并遵守相关服务规则。
 
+当前版本：`v5.1.0`
+
 ## 功能
 
-- 热水 / 冷水一键控制，以及常用设备快捷切换
-- 短信登录、账户管理和设备控制登录信息管理
+- 饮水设备一键启动；水温由设备上的实体按钮决定
+- 自动同步设备名称，支持设备别名、快捷移除和控制中心默认设备切换
+- 短信登录、账户管理，以及登录信息的在线校验、平台纠正与重复合并
 - 扫描二维码或手动添加设备编号
-- 每日签到与完整积分任务（最高约 330 积分）、积分明细，以及今日 / 本月 / 本年消费与预计饮水量统计
-- 桌面小部件、热水 / 冷水快捷设置磁贴
+- 每日签到与积分任务（最高约 330 积分），以及精简的任务执行记录
+- 本地优先的今日 / 本月 / 本年消费与预计饮水量统计
+- 桌面小部件、设备启动快捷设置磁贴
 - 浅色、深色和跟随系统的显示模式
+
+> 当前只验证和支持饮水设备。淋浴、洗衣等持续计费设备尚未完成协议验证，请勿尝试直接启动。
+
+## v5.1.0 更新
+
+- 合并冷水、热水入口为统一的“启动设备”，避免与设备实体水温按钮产生误解
+- 重做设备列表交互，明确控制中心默认设备，并加入名称同步、别名编辑和移除功能
+- 精简首页、任务页、登录页与运行记录，修复未登录时积分卡片文字错位
+- 消费统计改为本地累计优先，减少服务端历史记录缩短导致的统计回退
+- 手动导入登录信息时进行只读在线验证，自动纠正填反的平台并合并重复信息
+- 桌面小部件与快捷设置磁贴同步采用统一启动逻辑
 
 
 ## 运行环境
@@ -21,7 +36,7 @@ WaterWidget 是一个面向慧生活798用户的第三方 Android 设备控制�
 
 ## 构建
 
-项目采用 Gradle Kotlin DSL 与 JDK 17。源码通过 Gradle `sourceSets` 直接使用仓库根目录的 `src/main` 和 `src/test`。
+项目采用 Gradle Kotlin DSL、Gradle 8.13 与 JDK 17。源码通过 Gradle `sourceSets` 直接使用仓库根目录的 `src/main` 和 `src/test`。
 
 ### 配置敏感参数
 
@@ -41,20 +56,23 @@ cp secrets.properties.example secrets.properties
 
 ```bash
 # JVM 单元测试
-gradle testDebugUnitTest
+./gradlew testDebugUnitTest
 
 # Debug APK
-gradle assembleDebug
+./gradlew assembleDebug
 
 # 正式 Release（需设置签名环境变量）
-gradle assembleRelease
+./gradlew assembleRelease
 ```
 
-Debug APK 默认输出位置：
+APK 默认输出位置：
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/release/app-release.apk
 ```
+
+推送 `v*` 标签后，GitHub Actions 会运行单元测试、构建并校验签名，然后将 APK 发布到对应的 GitHub Release。
 
 ## 隐私与数据
 

@@ -14,11 +14,10 @@ public class WaterService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         final String did = intent.getStringExtra(WaterWidgetProvider.EXTRA_DID);
-        final String name = intent.getStringExtra(WaterWidgetProvider.EXTRA_NAME);
         final int widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                 AppWidgetManager.INVALID_APPWIDGET_ID);
 
-        WaterApi.start(this, did, name, status -> {
+        WaterApi.start(this, did, status -> {
             if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                 RemoteViews views = WaterWidgetProvider.buildViews(this, widgetId, status);
                 AppWidgetManager.getInstance(this).updateAppWidget(widgetId, views);

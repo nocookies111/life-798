@@ -4,6 +4,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
 
     <application
         android:label="@string/app_name"
@@ -55,8 +58,7 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.water.widget.ACTION_HOT" />
-                <action android:name="com.water.widget.ACTION_COLD" />
+                <action android:name="com.water.widget.ACTION_START" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
@@ -66,19 +68,8 @@
         <service android:name=".WaterService" android:exported="false" />
 
         <service
-            android:name=".HotWaterTileService"
-            android:label="热水"
-            android:icon="@drawable/ic_water_drop"
-            android:exported="true"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
-            <intent-filter>
-                <action android:name="android.service.quicksettings.action.QS_TILE" />
-            </intent-filter>
-        </service>
-
-        <service
-            android:name=".ColdWaterTileService"
-            android:label="冷水"
+            android:name=".WaterTileService"
+            android:label="启动设备"
             android:icon="@drawable/ic_water_drop"
             android:exported="true"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">

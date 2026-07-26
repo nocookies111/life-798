@@ -40,7 +40,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: '8.13'
 
       - name: Generate secrets.properties
         run: |
@@ -49,10 +49,10 @@ jobs:
           echo "API_CID=${{ secrets.API_CID }}" >> secrets.properties
 
       - name: Run unit tests
-        run: gradle testDebugUnitTest --no-daemon --stacktrace --info
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace --info
 
       - name: Build debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace --info
+        run: ./gradlew assembleDebug --no-daemon --stacktrace --info
 
       - name: Upload test reports
         if: always()
@@ -97,7 +97,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: '8.13'
 
       - name: Generate secrets.properties
         run: |
@@ -117,6 +117,9 @@ jobs:
           test -n "$ANDROID_KEY_ALIAS"
           test -n "$ANDROID_KEY_PASSWORD"
 
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon --stacktrace --info
+
       - name: Build signed release APK
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -125,7 +128,7 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waterwidget-release.jks"
-          ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/waterwidget-release.jks" gradle assembleRelease --no-daemon --stacktrace --info
+          ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/waterwidget-release.jks" ./gradlew assembleRelease --no-daemon --stacktrace --info
 
       - name: Verify release APK signature
         env:

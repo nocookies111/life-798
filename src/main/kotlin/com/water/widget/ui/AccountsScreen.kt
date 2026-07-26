@@ -180,8 +180,8 @@ private fun AccountCard(
                     )
                 }
             }
-            AccountInfoRow("日常登录信息", maskToken(account.alipayToken))
-            AccountInfoRow("设备控制信息", maskToken(account.appToken))
+            AccountInfoRow("积分服务", maskToken(account.alipayToken))
+            AccountInfoRow("设备控制", maskToken(account.appToken))
             AccountInfoRow("设备", account.deviceSummary)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = { onSetCurrent(account.phone) }, enabled = !account.current, modifier = Modifier.weight(1f)) {
@@ -189,9 +189,9 @@ private fun AccountCard(
                 }
                 OutlinedButton(onClick = { expanded = true }, modifier = Modifier.weight(1f)) { Text("更多设置") }
                 DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(text = { Text("查看或复制日常登录信息") }, enabled = account.alipayToken.isNotBlank(), onClick = { expanded = false; onRevealToken(account.phone, false) })
-                    DropdownMenuItem(text = { Text("查看或复制设备控制信息") }, enabled = account.appToken.isNotBlank(), onClick = { expanded = false; onRevealToken(account.phone, true) })
-                    DropdownMenuItem(text = { Text("设置设备控制信息") }, onClick = { expanded = false; onSetAppToken(account.phone) })
+                    DropdownMenuItem(text = { Text("复制积分服务登录") }, enabled = account.alipayToken.isNotBlank(), onClick = { expanded = false; onRevealToken(account.phone, false) })
+                    DropdownMenuItem(text = { Text("复制设备控制登录") }, enabled = account.appToken.isNotBlank(), onClick = { expanded = false; onRevealToken(account.phone, true) })
+                    DropdownMenuItem(text = { Text("设置设备控制登录") }, onClick = { expanded = false; onSetAppToken(account.phone) })
                     DropdownMenuItem(text = { Text("删除账户") }, onClick = { expanded = false; onDelete(account.phone) })
                 }
             }
