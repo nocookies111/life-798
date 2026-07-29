@@ -24,9 +24,9 @@ WaterWidget 是一个面向慧生活798用户的第三方 Android 设备控制�
 
 项目采用 Gradle Kotlin DSL、Gradle 8.13 与 JDK 17。源码通过 Gradle `sourceSets` 直接使用仓库根目录的 `src/main` 和 `src/test`。
 
-### 配置敏感参数
+### 配置参数
 
-项目中的 API 地址、签名盐值等敏感信息通过 `secrets.properties` 注入，**不会提交到版本控制**。构建前需手动创建：
+项目中的 API 地址、签名盐值等信息通过 `secrets.properties` 注入，**不会提交到版本控制**。构建前需手动创建：
 
 1. 复制项目根目录的 `secrets.properties.example` 为 `secrets.properties`
 2. 将其中的占位值替换为实际值
