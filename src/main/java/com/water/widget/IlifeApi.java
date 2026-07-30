@@ -213,6 +213,24 @@ public class IlifeApi {
         }).start();
     }
 
+    /** 用设备控制登录信息获取最近账单；type=91 为设备消费。 */
+    public static void billListWithToken(final String token, final JsonCallback cb) {
+        new Thread(() -> {
+            try {
+                String body = httpRawApp(
+                        "GET",
+                        GATEWAY + "/bill/lst-owner?page=0&size=20",
+                        null,
+                        token,
+                        "1,1"
+                );
+                cb.onResult(new JSONObject(body), null);
+            } catch (Exception e) {
+                cb.onResult(null, e.getMessage());
+            }
+        }).start();
+    }
+
     /** 用指定 token 执行积分任务（用于双平台合并）。 */
     public static void scoreSendWithToken(final String token, final String uid,
                                           final String adId, final JsonCallback cb) {
@@ -350,6 +368,53 @@ public class IlifeApi {
                     cb.onResult(null, "TOKEN_EXPIRED");
                 } else if (code == -21) {
                     cb.onResult(null, useApp ? msg : "需要设备控制登录信息，请先在账户中添加");
+                } else if (code == -88) {
+                    cb.onResult(null, "未签约代扣协议，请在服务端完成签约后再使用");
+                } else if (code == -87) {
+                    cb.onResult(null, "签约已过期，请重新签约");
+                } else if (code == -52) {
+                    cb.onResult(null, "账户欠费，请充值后使用");
+                } else if (code == -20) {
+                    cb.onResult(null, "未绑定一卡通账号，请先完成账户绑定");
+                } else if (code == -19) {
+                    cb.onResult(null, "设备准备中，请稍后");
+                } else if (code == -82) {
+                    cb.onResult(null, "需要支付");
+                } else {
+                    cb.onResult(null, msg.isEmpty() ? "code=" + code : msg);
+                }
+            } catch (Exception e) {
+                cb.onResult(null, e.getMessage());
+            }
+        }).start();
+    }
+
+    /**
+     * 使用调用时冻结的设备控制 Token 启动设备，避免异步请求期间切换当前账户后串用凭据。
+     */
+    public static void devStartWithToken(
+            final String appToken,
+            final String did,
+            final TextCallback cb
+    ) {
+        new Thread(() -> {
+            if (appToken == null || appToken.isEmpty()) {
+                cb.onResult(null, "需要设备控制登录信息，请先在账户中添加");
+                return;
+            }
+            String url = GATEWAY + "/dev/start?did=" + enc(did)
+                    + "&upgrade=true&ptype=91&rcp=false";
+            try {
+                String body = httpRawApp("GET", url, null, appToken, "1,1");
+                JSONObject json = new JSONObject(body);
+                int code = json.optInt("code", -999);
+                String msg = json.optString("msg", "");
+                if (code == 0) {
+                    cb.onResult("成功 ✓", null);
+                } else if (code == -99) {
+                    cb.onResult(null, "TOKEN_EXPIRED");
+                } else if (code == -21) {
+                    cb.onResult(null, msg);
                 } else if (code == -88) {
                     cb.onResult(null, "未签约代扣协议，请在服务端完成签约后再使用");
                 } else if (code == -87) {

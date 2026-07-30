@@ -43,13 +43,20 @@ jobs:
           gradle-version: '8.13'
 
       - name: Generate secrets.properties
+        env:
+          API_GATEWAY: ${{ secrets.API_GATEWAY }}
+          SIGN_SALT: ${{ secrets.SIGN_SALT }}
+          API_CID: ${{ secrets.API_CID }}
         run: |
-          echo "API_GATEWAY=${{ secrets.API_GATEWAY }}" > secrets.properties
-          echo "SIGN_SALT=${{ secrets.SIGN_SALT }}" >> secrets.properties
-          echo "API_CID=${{ secrets.API_CID }}" >> secrets.properties
+          printf 'API_GATEWAY=%s\n' "$API_GATEWAY" > secrets.properties
+          printf 'SIGN_SALT=%s\n' "$SIGN_SALT" >> secrets.properties
+          printf 'API_CID=%s\n' "$API_CID" >> secrets.properties
 
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon --stacktrace --info
+
+      - name: Run Android lint
+        run: ./gradlew lintDebug --no-daemon --stacktrace
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --no-daemon --stacktrace --info
@@ -99,11 +106,21 @@ jobs:
         with:
           gradle-version: '8.13'
 
-      - name: Generate secrets.properties
+      - name: Verify release tag matches app version
         run: |
-          echo "API_GATEWAY=${{ secrets.API_GATEWAY }}" > secrets.properties
-          echo "SIGN_SALT=${{ secrets.SIGN_SALT }}" >> secrets.properties
-          echo "API_CID=${{ secrets.API_CID }}" >> secrets.properties
+          version_name="$(sed -n 's/^[[:space:]]*versionName = "\(.*\)"/\1/p' app/build.gradle.kts | head -n 1)"
+          test -n "$version_name"
+          test "$GITHUB_REF_NAME" = "v$version_name"
+
+      - name: Generate secrets.properties
+        env:
+          API_GATEWAY: ${{ secrets.API_GATEWAY }}
+          SIGN_SALT: ${{ secrets.SIGN_SALT }}
+          API_CID: ${{ secrets.API_CID }}
+        run: |
+          printf 'API_GATEWAY=%s\n' "$API_GATEWAY" > secrets.properties
+          printf 'SIGN_SALT=%s\n' "$SIGN_SALT" >> secrets.properties
+          printf 'API_CID=%s\n' "$API_CID" >> secrets.properties
 
       - name: Check release signing configuration
         env:
@@ -120,6 +137,9 @@ jobs:
       - name: Run unit tests
         run: ./gradlew testDebugUnitTest --no-daemon --stacktrace --info
 
+      - name: Run Android lint
+        run: ./gradlew lintDebug --no-daemon --stacktrace
+
       - name: Build signed release APK
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -127,7 +147,7 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waterwidget-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waterwidget-release.jks"
           ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/waterwidget-release.jks" ./gradlew assembleRelease --no-daemon --stacktrace --info
 
       - name: Verify release APK signature
@@ -136,15 +156,20 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          EXPECTED_RELEASE_CERT_SHA256: 9bd997fcceb68c970799be397d65f4b9c4628af4bd0050422b230d82f8d9fc92
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waterwidget-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/waterwidget-release.jks"
           keytool -list -v -keystore "$RUNNER_TEMP/waterwidget-release.jks" -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" | grep "SHA256:"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/*.apk
+          apk_path="app/build/outputs/apk/release/app-release.apk"
+          signer_output="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk_path")"
+          printf '%s\n' "$signer_output"
+          actual_cert_sha256="$(printf '%s\n' "$signer_output" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}')"
+          test "$actual_cert_sha256" = "$EXPECTED_RELEASE_CERT_SHA256"
 
       - name: Prepare release APK
         run: |
-          apk_path=$(find app/build/outputs/apk/release -name '*.apk' -print -quit)
-          test -n "$apk_path"
+          apk_path="app/build/outputs/apk/release/app-release.apk"
+          test -f "$apk_path"
           mkdir -p "$RUNNER_TEMP/release-assets"
           cp "$apk_path" "$RUNNER_TEMP/release-assets/WaterWidget-${GITHUB_REF_NAME}-release.apk"
 

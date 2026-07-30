@@ -6,8 +6,10 @@ package com.water.widget.ui
  */
 object TaskLogFormatter {
     private val accountHeader = Regex("""^-+\s*\[(.+?)]\s+通道.+?-+$""")
-    private val accountResult = Regex("""^\[(.+?)]\s+本账号预计获得\s+(\d+)\s+分$""")
-    private val allDone = Regex("""^=+\s*全部完成，本次预计获得\s+(\d+)\s+分\s*=+$""")
+    private val accountResult = Regex("""^\[(.+?)]\s+本账号(?:预计)?获得\s+(\d+)\s+分$""")
+    private val allDone = Regex("""^=+\s*全部完成，本次(?:预计)?获得\s+(\d+)\s+分\s*=+$""")
+    private val partialDone =
+        Regex("""^=+\s*任务结束，部分未完成，本次(?:预计)?获得\s+(\d+)\s+分\s*=+$""")
     private val taskPlan = Regex("""^\[\d+/\d+]\s+\[(?:APP|支付宝)]""")
     private val signInSuccess = Regex("""^\[(.+?)]\s+签到成功\s+\+(\d+)分(?:（重试）)?$""")
     private val signInReward = Regex("""^\[(.+?)]\s+连签奖励\s+\+(\d+)分(（.+）)?$""")
@@ -34,6 +36,9 @@ object TaskLogFormatter {
         }
         allDone.matchEntire(line)?.let {
             return "全部完成 · 本次获得 ${it.groupValues[1]} 分"
+        }
+        partialDone.matchEntire(line)?.let {
+            return "任务结束 · 部分未完成 · 本次获得 ${it.groupValues[1]} 分"
         }
         if (line.contains("首页任务中心：一键运行全部账号")) {
             return "开始运行全部账号"

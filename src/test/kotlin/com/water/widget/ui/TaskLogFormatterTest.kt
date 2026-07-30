@@ -41,6 +41,14 @@ class TaskLogFormatterTest {
             "全部完成 · 本次获得 80 分",
             TaskLogFormatter.format("===== 全部完成，本次预计获得 80 分 =====")
         )
+        assertEquals(
+            "全部完成 · 本次获得 80 分",
+            TaskLogFormatter.format("===== 全部完成，本次获得 80 分 =====")
+        )
+        assertEquals(
+            "任务结束 · 部分未完成 · 本次获得 30 分",
+            TaskLogFormatter.format("===== 任务结束，部分未完成，本次获得 30 分 =====")
+        )
     }
 
     @Test

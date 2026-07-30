@@ -1,6 +1,10 @@
 package com.water.widget;
 
+import android.annotation.SuppressLint;
+import android.appwidget.AppWidgetManager;
+import android.app.PendingIntent;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.service.quicksettings.Tile;
@@ -34,24 +38,45 @@ public class WaterTileService extends TileService {
             return;
         }
 
+        WaterService.StartResult result = WaterService.start(
+                this,
+                did,
+                AppWidgetManager.INVALID_APPWIDGET_ID
+        );
+        if (result == WaterService.StartResult.ALREADY_RUNNING) {
+            showToast("已有接水会话正在监测");
+            return;
+        }
+        if (result == WaterService.StartResult.FAILED) {
+            showToast("设备启动失败，请稍后重试");
+            return;
+        }
+
         updateTile(Tile.STATE_ACTIVE, "启动中…");
-        WaterApi.start(this, did, status -> mainHandler.post(() -> {
+        showToast("设备启动中…");
+        mainHandler.postDelayed(() -> {
             updateTile(Tile.STATE_INACTIVE, LABEL);
-            showToast(status);
-            if (isFailureStatus(status)) openConfig(true);
-        }));
+        }, 1200L);
     }
 
-    private boolean isFailureStatus(String status) {
-        return status == null || status.contains("失败") || status.contains("未登录");
-    }
-
+    @SuppressLint("StartActivityAndCollapseDeprecated")
+    @SuppressWarnings("deprecation")
     private void openConfig(boolean recovery) {
         Intent cfg = new Intent(this, ConfigActivity.class);
         if (recovery) cfg.putExtra(ConfigActivity.EXTRA_OPEN_WATER_RECOVERY, true);
         cfg.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP
                 | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        startActivity(cfg);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            PendingIntent pendingIntent = PendingIntent.getActivity(
+                    this,
+                    0,
+                    cfg,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+            startActivityAndCollapse(pendingIntent);
+        } else {
+            startActivityAndCollapse(cfg);
+        }
     }
 
     private void updateTile(int state, String label) {

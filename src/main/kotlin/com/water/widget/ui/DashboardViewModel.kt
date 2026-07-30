@@ -2,13 +2,16 @@ package com.water.widget.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import com.water.widget.Account
 import com.water.widget.AccountStore
+import com.water.widget.TaskRunRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONObject
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 private val DEFAULT_TASK_LOGS = emptyList<String>()
 
@@ -25,12 +28,16 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
 
     private var currentScore: Int? = null
     private var currentScoreLogs: JSONObject? = null
-    private var taskRunning = false
-    private var taskGained = 0
-    private var taskLogs = DEFAULT_TASK_LOGS
+    private var taskRun = TaskRunRepository.state.value
 
     init {
         reloadAccounts()
+        viewModelScope.launch {
+            TaskRunRepository.state.collect { runState ->
+                taskRun = runState
+                publish()
+            }
+        }
     }
 
     fun reloadAccounts(resetScore: Boolean = false) {
@@ -61,47 +68,6 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         return account
     }
 
-    fun beginTasks(): List<Account>? {
-        if (taskRunning) return null
-        val accounts = AccountStore.list(storeContext).filter { it.hasToken() }
-        if (accounts.isEmpty()) return emptyList()
-        taskRunning = true
-        taskGained = 0
-        taskLogs = emptyList()
-        publish()
-        return accounts
-    }
-
-    fun appendTaskLog(line: String) {
-        val updatedLogs = TaskLogFormatter.append(taskLogs, line)
-        if (updatedLogs === taskLogs) return
-        taskLogs = updatedLogs
-        publish()
-    }
-
-    fun addTaskGained(gained: Int) {
-        taskGained += gained
-        publish()
-    }
-
-    fun finishTasks() {
-        taskRunning = false
-        publish()
-    }
-
-    fun cancelTasks() {
-        if (!taskRunning) return
-        taskRunning = false
-        taskLogs = (taskLogs + "任务已因页面关闭而中止，可重新运行。").takeLast(160)
-        publish()
-    }
-
-    val isTaskRunning: Boolean
-        get() = taskRunning
-
-    val totalTaskGained: Int
-        get() = taskGained
-
     private fun publish() {
         val accounts = AccountStore.list(storeContext)
         val current = AccountStore.getCurrent(storeContext)
@@ -121,7 +87,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     usageOverride = usage
                 ),
                 accounts = DashboardUiStateFactory.accountsFrom(accounts, current?.phone),
-                tasks = TaskUiStateFactory.from(accounts, taskRunning, taskGained, taskLogs)
+                tasks = TaskUiStateFactory.from(
+                    accounts,
+                    taskRun.running,
+                    taskRun.totalGained,
+                    taskRun.logs
+                )
             )
         }
     }

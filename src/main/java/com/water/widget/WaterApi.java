@@ -29,6 +29,26 @@ public class WaterApi {
         });
     }
 
+    /** 使用调用时冻结的设备控制登录信息启动设备。 */
+    public static void startWithToken(
+            final String appToken,
+            final String did,
+            final Callback cb
+    ) {
+        IlifeApi.devStartWithToken(appToken, did, new IlifeApi.TextCallback() {
+            @Override
+            public void onResult(String text, String err) {
+                if (text != null) {
+                    cb.onResult("设备 " + text);
+                } else if ("TOKEN_EXPIRED".equals(err)) {
+                    cb.onResult("启动失败：登录已过期，请重新登录");
+                } else {
+                    cb.onResult("启动失败：" + err);
+                }
+            }
+        });
+    }
+
     static String getToken(Context ctx) {
         Account a = AccountStore.getCurrent(ctx);
         return a != null ? a.token : "";

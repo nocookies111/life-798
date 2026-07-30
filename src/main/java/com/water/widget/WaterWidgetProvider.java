@@ -36,15 +36,21 @@ public class WaterWidgetProvider extends AppWidgetProvider {
             int widgetId = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,
                     AppWidgetManager.INVALID_APPWIDGET_ID);
 
-            if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                AppWidgetManager.getInstance(context).updateAppWidget(widgetId,
-                        buildViews(context, widgetId, "设备启动中…"));
+            WaterService.StartResult result = WaterService.start(context, did, widgetId);
+            String status;
+            if (result == WaterService.StartResult.STARTED) {
+                status = "设备启动中…";
+            } else if (result == WaterService.StartResult.ALREADY_RUNNING) {
+                status = "已有接水会话正在监测";
+            } else {
+                status = "启动失败，请稍后重试";
             }
-
-            Intent svc = new Intent(context, WaterService.class);
-            svc.putExtra(EXTRA_DID, did);
-            svc.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
-            context.startService(svc);
+            if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                AppWidgetManager.getInstance(context).updateAppWidget(
+                        widgetId,
+                        buildViews(context, widgetId, status)
+                );
+            }
         }
     }
 
