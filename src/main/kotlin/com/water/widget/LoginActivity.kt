@@ -16,6 +16,11 @@ import org.json.JSONObject
 
 /**
  * Compose 版登录页：先完成设备登录，再按需补充积分登录。
+ *
+ * 两个入口（用水 / 积分）都走 App 通道：`ApplicationType: 1,1` + `login?sign=`。
+ * 支付宝小程序通道（1,5）的登录体必须有 `openCode`，它由官方小程序 `my.getAuthCode` 签发、
+ * 绑定官方 appId，服务端要用它换 openid，第三方客户端生成不出来；
+ * 而积分接口只校验 `Authorization`，App 通道的 token 同样能拿积分，所以这里不再尝试 1,5 通道。
  */
 class LoginActivity : ComponentActivity() {
     private var platform = LoginPlatform.APP
@@ -105,7 +110,9 @@ class LoginActivity : ComponentActivity() {
             return
         }
         setLoading(true)
-        IlifeApi.sendSms(phone, graphCode, captchaKey, platform == LoginPlatform.APP) { json, err ->
+        // 短信也走 App 通道（asApp = true），与下面的登录请求保持同一套协议头（1,1 / 3.1.9），
+        // 避免"短信按小程序通道发、登录按 App 通道发"的混搭。
+        IlifeApi.sendSms(phone, graphCode, captchaKey, true) { json, err ->
             runOnUiThread {
                 setLoading(false)
                 if (json == null) {
@@ -133,7 +140,8 @@ class LoginActivity : ComponentActivity() {
         setLoading(true)
         val requestPhone = phone
         val requestPlatform = platform
-        IlifeApi.login(requestPhone, smsCode, requestPlatform == LoginPlatform.APP) { json, err ->
+        // 恒传 asApp = true：两个入口都走 App 通道登录，原因见类注释。
+        IlifeApi.login(requestPhone, smsCode, true) { json, err ->
             runOnUiThread {
                 setLoading(false)
                 if (json == null) {
@@ -161,18 +169,21 @@ class LoginActivity : ComponentActivity() {
 
         val existing = AccountStore.get(this, requestPhone)
         val account = existing ?: Account(requestPhone)
-        if (requestPlatform == LoginPlatform.APP) account.appToken = newToken else account.token = newToken
+        // 这里拿到的永远是 App 通道 token，只能写进 appToken：
+        // 写进 token 会让下游 useApp = !hasToken() 判成小程序通道，
+        // score-send 就会用 MINI_SIGN_SALT 去签一个 App token，必然验签失败；
+        // token 字段保留给"手动导入的真实小程序凭据"这条路径。
+        account.appToken = newToken
         if (TextUtils.isEmpty(account.uid)) account.uid = loginData.optString("uid")
         if (TextUtils.isEmpty(account.eid)) account.eid = loginData.optString("eid")
         AccountStore.addOrUpdate(this, account)
         fetchUidAsync(requestPhone, newToken)
         toast(
-            if (account.hasToken() && account.hasAppToken()) {
-                "设备与积分登录均已完成"
-            } else if (requestPlatform == LoginPlatform.APP) {
-                "设备登录已完成；现在可使用设备，补充积分登录可获得更多积分"
-            } else {
-                "积分登录已完成；请先用同一手机号完成设备登录以使用设备"
+            when {
+                // 积分入口实际完成的是 App 通道登录，提示里说清楚，免得用户以为还要去支付宝授权。
+                requestPlatform == LoginPlatform.ALIPAY -> "积分登录已完成（App 通道，无需支付宝小程序授权）"
+                account.hasToken() -> "设备与积分登录均已完成"
+                else -> "用水登录已完成；积分功能无需单独登录，可直接使用"
             }
         )
         setResult(Activity.RESULT_OK)
